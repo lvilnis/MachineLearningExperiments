@@ -1,12 +1,7 @@
 import scalala.library.Random
+import LukeUtils._
 
 object CleanedUpMarkov {
-
-  val machineLearningPath = "C:\\Users\\Luke\\Desktop\\Files For Machine Learning\\";
-
-  def readTextFile(path: String): String = {
-    io.Source.fromFile(machineLearningPath + path).mkString
-  }
 
   def generateSweetMarkovChainFromWarAndPeace() {
     // Screw all this noise. Let's generate markov chains in the style of War and Peace!
@@ -15,7 +10,7 @@ object CleanedUpMarkov {
     // 2. start with "the"
     // 3. generate 50 words after that
 
-    val warAndPeace = readTextFile("WarAndPeace.txt")
+    val warAndPeace = readLocalTextFile("WarAndPeace.txt")
     val words = warAndPeace
       .filterNot { c => c == ',' || c == '.' || c == '"' }
       .map { _.toLower }
@@ -57,6 +52,6 @@ object CleanedUpMarkov {
   }
 
     def main(args: Array[String]) {
-    
+      generateSweetMarkovChainFromWarAndPeace()
     }
 }

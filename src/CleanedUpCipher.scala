@@ -1,17 +1,13 @@
 import scalala.library.Random
 import scalala.tensor.dense.DenseMatrix
 import scalala.tensor.Matrix
+import LukeUtils._
+import MachineLearningUtils._
 
 object CleanedUpCipher {
 
-  val machineLearningPath = "C:\\Users\\Luke\\Desktop\\Files For Machine Learning\\";
-
-  def readTextFile(path: String): String = {
-    io.Source.fromFile(machineLearningPath + path).mkString
-  }
-
   def calculateFirstOrderTransitions(str: String): (Map[(Char, Char), Double], Int) = {
-    val transitionPairs = getConsecutiveLetterPairs(str)
+    val transitionPairs = getConsecutiveLetterOrSpacePairs(str)
     val weightedTransitions = transitionPairs groupBy identity mapValues { _.length }
     val theMap = weightedTransitions mapValues { n => Math.log((n.toDouble + 1) / transitionPairs.length) }
     (theMap, transitionPairs.length)
@@ -35,7 +31,7 @@ object CleanedUpCipher {
   }
 
   def getFirstOrderTransitionMatrixFromFile(fileName: String): Matrix[Double] = {
-    val fileText = readTextFile(fileName)
+    val fileText = readLocalTextFile(fileName)
     val (transitionMap, numPairs) = calculateFirstOrderTransitions(fileText)
     println(transitionMap.toSeq sortBy (kvp => kvp._1))
     val matrix = turnFirstOrderTransitionsIntoMatrix(transitionMap, numPairs)
@@ -43,52 +39,26 @@ object CleanedUpCipher {
     matrix
   }
 
-  def getConsecutiveLetterPairs(codedMsg: String): Seq[(Char, Char)] = {
-    val sanitizedMsg = codedMsg filter { c => c.isLetter || c.isSpaceChar } toLowerCase;
-    sanitizedMsg zip (sanitizedMsg drop 1)
-  }
-
   def getLogPlausibilityOfSubstitutionCipher(transitionMatrix: Matrix[Double])(codedMsg: String, c: SubstitutionCipher): Double = {
     // safe to use substitution cipher since we've eliminated all punc/spaces and toLower'd it
-    getConsecutiveLetterPairs(codedMsg)
+    getConsecutiveLetterOrSpacePairs(codedMsg)
       .map { case (s1, s2) => transitionMatrix(letter2digit(c(s1)) - 1, letter2digit(c(s2)) - 1) }
       .reduce { _ + _ }
     // we use + instead of * because we've converted to logs
   }
 
-  def randomlyTransposeCipher(c: SubstitutionCipher): SubstitutionCipher = {
-    val Seq(l1, l2) = scramble(1 to 27) take 2 map digit2letter
-    c updated (l1, c(l2)) updated (l2, c(l1))
-  }
+  type SubstitutionCipher = Map[Char, Char]
 
-
-    type SubstitutionCipher = Map[Char, Char]
-
-  type CipherTranslator = Function[Char, Char]
+  type CipherTranslator = Char => Char
 
   // this just fills in the things we don't want to consider like punctuation and spaces
-  def translatorFromCipher(c: SubstitutionCipher): CipherTranslator = {
-    c orElse { case c: Char => c }
-  }
+  def translatorFromCipher(c: SubstitutionCipher): CipherTranslator = c orElse { case c: Char => c }
 
-  def scramble[A](xs: Seq[A]): Seq[A] =
-    xs sortBy { _ => Random.rand()(Random.mt) }
+  def randomlyTransposeCipher(c: SubstitutionCipher) = randomlySwapTwoMapEntries(c)
+  
+  def generateRandomCipher(): SubstitutionCipher = generateRandomPermutationMap(alphabet toSet)
 
-  def generateRandomCipher(): SubstitutionCipher = {
-    var m = Map.empty[Char, Char]
-    for ((i, o) <- (1 to 27) zip (scramble (1 to 27));
-         input = digit2letter(i);
-         output = digit2letter(o)) {
-      m = m updated (input, output)
-    }
-    m
-  }
-
-  def invertCipher(c: SubstitutionCipher): SubstitutionCipher = {
-    val inv = c map { case (a, b) => (b, a) }
-    println(inv)
-    inv
-  }
+  def invertCipher(c: SubstitutionCipher): SubstitutionCipher = c map { case (a, b) => (b, a) }
 
   def algorithmFromTheDoc() {
     // Ingredients:
@@ -97,7 +67,7 @@ object CleanedUpCipher {
     // 2. A substitution cipher you want to figure out:
     // 3. A document coded in some substitution cipher you wanna figure out:
     val randomCipher = generateRandomCipher()
-    val encodedDocument = readTextFile("OscarWildePoems.txt") map (translatorFromCipher(randomCipher))
+    val encodedDocument = readLocalTextFile("OscarWildePoems.txt") map (translatorFromCipher(randomCipher))
 
     def logPl(c: SubstitutionCipher): Double =
       getLogPlausibilityOfSubstitutionCipher(transitionMatrixFromEnglish)(encodedDocument, c)
