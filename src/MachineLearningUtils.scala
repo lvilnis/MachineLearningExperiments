@@ -1,19 +1,19 @@
 
 object MachineLearningUtils {
 
-  // General way to grab the first-order transitions of a sequence, regularized in a particular way
+  // General function to grab the first-order transitions of a sequence, regularized in a particular way
   def getConsecutivePairs[T](codedMsg: Seq[T])(mapper: T => T, predicate: T => Boolean): Seq[(T, T)] = {
     val sanitizedMsg = codedMsg filter predicate map mapper
     sanitizedMsg zip (sanitizedMsg drop 1)
   }
 
-  def getConsecutiveLetterOrSpacePairs(codedMsg: String): Seq[(Char, Char)] = {
+  def getConsecutiveLetterOrSpacePairs(codedMsg: String): Seq[(Char, Char)] =
     getConsecutivePairs(codedMsg)(_.toLower, c => c.isLetter || c.isSpaceChar)
-  }
 
-  def scramble[A](xs: Seq[A]): Seq[A] = {
+  def scramble[A](xs: Seq[A]): Seq[A] =
     xs sortBy { _ => scala.math.random }
-  }
+
+  // hackaday ??
 
   def randomlySwapTwoMapEntries[T, U](map: Map[T, U]): Map[T, U] = {
     if (map.keys.toSeq.lengthCompare(2) < 0) return map;
