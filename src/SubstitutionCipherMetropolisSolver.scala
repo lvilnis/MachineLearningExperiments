@@ -4,7 +4,7 @@ import scalala.tensor.Matrix
 import LukeUtils._
 import MachineLearningUtils._
 
-object CleanedUpCipher {
+object SubstitutionCipherMetropolisSolver {
 
   val printDebug = false
 

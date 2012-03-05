@@ -1,6 +1,6 @@
 import LukeUtils._
 
-object CleanedUpMarkov {
+object MarkovChainGenerator {
 
   def generateSweetMarkovChainFromWarAndPeace() {
     // 1. build markov matrix from war and peace
