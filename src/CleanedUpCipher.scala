@@ -1,11 +1,12 @@
 import annotation.tailrec
-import scalala.library.Random
 import scalala.tensor.dense.DenseMatrix
 import scalala.tensor.Matrix
 import LukeUtils._
 import MachineLearningUtils._
 
 object CleanedUpCipher {
+
+  val printDebug = false
 
   def calculateFirstOrderTransitions(str: String): (Map[(Char, Char), Double], Int) = {
     val transitionPairs = getConsecutiveLetterOrSpacePairs(str)
@@ -21,22 +22,21 @@ object CleanedUpCipher {
 
   def turnFirstOrderTransitionsIntoMatrix(trans: Map[(Char, Char), Double], defaultValue: Double): Matrix[Double] = {
     val m = DenseMatrix.zeros[Double](27, 27)
-    for (x <- 1 to 27;
-         y <- 1 to 27;
-         xl = digit2letter(x);
-         yl = digit2letter(y)) {
-      // we add 1 to every slot to avoid issues w/ multiplying by zeros, so default value is log(1 / numPairs)
-      m(x - 1, y - 1) = trans getOrElse ((xl, yl), defaultValue)
-    }
+    for { x <- 1 to 27
+          y <- 1 to 27
+          xl = digit2letter(x)
+          yl = digit2letter(y)
+    } m(x - 1, y - 1) = trans getOrElse ((xl, yl), defaultValue)
     m
   }
 
   def getFirstOrderTransitionMatrixFromFile(fileName: String): Matrix[Double] = {
     val fileText = readLocalTextFile(fileName)
     val (transitionMap, numPairs) = calculateFirstOrderTransitions(fileText)
-    println(transitionMap.toSeq sortBy { case (key, _) => key })
+    if (printDebug) { println(transitionMap.toSeq sortBy { case (key, _) => key }) }
+    // we add 1 to every slot to avoid issues w/ multiplying by zeros, so default value is log(1 / numPairs)
     val matrix = turnFirstOrderTransitionsIntoMatrix(transitionMap, scala.math.log(1f / numPairs))
-    println(matrix)
+    if (printDebug) { println(matrix) }
     matrix
   }
 
@@ -63,7 +63,8 @@ object CleanedUpCipher {
       .reduce { _ + _ }
     // we use + instead of * because we've converted to logs
   }
-
+  
+  // Uses Metropolis algorithm
   def findBestCandidateCipher(transitionMatrix: Matrix[Double], encodedDocument: String, numIterations: Int): SubstitutionCipher = {
     def logPl(c: SubstitutionCipher): Double =
       getLogPlausibilityOfSubstitutionCipher(transitionMatrix)(encodedDocument, c)
@@ -96,9 +97,9 @@ object CleanedUpCipher {
   }
 
   def main(args: Array[String]) {
-    val transitionMatrixFromEnglish = getFirstOrderTransitionMatrixFromFile("WarAndPeace.txt")
+    val transitionMatrixFromEnglish = getFirstOrderTransitionMatrixFromFile("SubstitutionCipher\\WarAndPeace.txt")
     val randomCipher = generateRandomCipher()
-    val encodedDocument = readLocalTextFile("OscarWildePoems.txt") map (translatorFromCipher(randomCipher))
+    val encodedDocument = readLocalTextFile("SubstitutionCipher\\SampleTextToEncipher.txt") map (translatorFromCipher(randomCipher))
 
     val soln = findBestCandidateCipher(transitionMatrixFromEnglish, encodedDocument, 20000)
 

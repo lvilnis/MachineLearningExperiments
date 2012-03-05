@@ -21,10 +21,10 @@ object LukeUtils {
   def writeLocalTextFile(path: String, contents: String): Unit =
     writeTextFile(localPath + path, contents)
 
-  case class Pipeable[A](a: A) {
+  class Pipeable[A](a: A) {
     def |>[B](f: A => B) = f(a)
   }
 
-  implicit def convert[A](s: A) = Pipeable(s)
+  implicit def convert[A](s: A) = new Pipeable(s)
 
 }

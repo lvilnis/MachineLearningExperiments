@@ -1,4 +1,3 @@
-import scalala.library.Random
 import LukeUtils._
 
 object CleanedUpMarkov {
@@ -8,7 +7,7 @@ object CleanedUpMarkov {
     // 2. start with "the"
     // 3. generate 50 words after that
 
-    val warAndPeace = readLocalTextFile("WarAndPeace.txt")
+    val warAndPeace = readLocalTextFile("MarkovChain\\WarAndPeace.txt")
     val words = warAndPeace
       .filterNot { c => c == ',' || c == '.' || c == '"' }
       .map { _.toLower }
@@ -20,7 +19,7 @@ object CleanedUpMarkov {
       props.toSeq
         .map { case ((a, b), num) => (a, (b, num)) }
         .groupBy { case (a, (b, num)) => a }
-        .mapValues { xs => xs map { case (a, (b, num)) => (b, num) } }
+        .mapValues { _ map { case (a, (b, num)) => (b, num) } }
 
     val sortedByFrequency =
       wordsToFollowingWordsAndCounts mapValues { _ sortBy { _._2 } }
@@ -49,7 +48,7 @@ object CleanedUpMarkov {
     println(loop(startWord, 0, startWord))
   }
 
-    def main(args: Array[String]) {
-      generateSweetMarkovChainFromWarAndPeace()
-    }
+  def main(args: Array[String]) {
+    generateSweetMarkovChainFromWarAndPeace()
+  }
 }

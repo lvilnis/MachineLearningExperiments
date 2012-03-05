@@ -13,8 +13,6 @@ object MachineLearningUtils {
   def scramble[A](xs: Seq[A]): Seq[A] =
     xs sortBy { _ => scala.math.random }
 
-  // hackaday ??
-
   def randomlySwapTwoMapEntries[T, U](map: Map[T, U]): Map[T, U] = {
     if (map.keys.toSeq.lengthCompare(2) < 0) return map;
     // eww, slow... just pick two random keys, don't sort all of them!!
