@@ -10,7 +10,7 @@ object SubstitutionCipherMetropolisSolver {
 
   def calculateFirstOrderTransitions(str: String): (Map[(Char, Char), Double], Int) = {
     val transitionPairs = getConsecutiveLetterOrSpacePairs(str)
-    val weightedTransitions = transitionPairs groupBy identity mapValues { _.length }
+    val weightedTransitions = getCounts(transitionPairs)
     val theMap = weightedTransitions mapValues { n => scala.math.log((n.toDouble + 1) / transitionPairs.length) }
     (theMap, transitionPairs.length)
   }
