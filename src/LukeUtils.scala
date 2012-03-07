@@ -27,4 +27,7 @@ object LukeUtils {
 
   implicit def convert[A](s: A) = new Pipeable(s)
 
+  def groupPairsByFirst[A, B](set: Seq[(A, B)]): Map[A, Seq[B]] =
+    set groupBy { _._1 } mapValues { _.toSeq map { _._2 } }
+
 }

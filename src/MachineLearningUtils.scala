@@ -8,14 +8,13 @@ object MachineLearningUtils {
 
   // This just strips out all numbers, turns all whitespace to single space, and makes lowercase
   def cleanupString(rawStr: String): String =
-    if (rawStr.isEmpty) ""
-    else getWordSequenceFromString(rawStr) reduce { _ + " " + _ }
+    rawStr replaceAll ("\\s+", " ") filter { c => c.isLetter || c.isSpaceChar } toLowerCase
 
   def getConsecutiveLetterOrSpacePairs(codedMsg: String): Seq[(Char, Char)] =
     getConsecutivePairs(cleanupString(codedMsg))
 
   def getWordSequenceFromString(str: String): Seq[String] =
-    str filter { c => c.isLetter || c.isSpaceChar } split "\\s+" map { _.toLowerCase }
+    str.toLowerCase filter { c => c.isLetter || c.isSpaceChar } split "\\s+"
 
   def getCounts[T](items: Seq[T]): Map[T, Int] =
     items groupBy identity mapValues { _.length }
