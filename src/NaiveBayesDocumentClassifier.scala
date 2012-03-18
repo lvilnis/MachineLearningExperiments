@@ -1,3 +1,4 @@
+
 import LukeUtils._
 import MachineLearningUtils._
 
@@ -6,7 +7,7 @@ object NaiveBayesDocumentClassifier {
   abstract sealed class BritishAuthor
   case object OscarWilde extends BritishAuthor
   case object CharlesDickens extends BritishAuthor
-  
+
   type BritClassifier = DocumentClassifier[BritishAuthor]
 
   // note to self: use "Dispatch" library to download from Project Gutenberg directly....
@@ -21,7 +22,7 @@ object NaiveBayesDocumentClassifier {
     Set(
       "AChristmasCarol",
         "OliverTwist",
-      
+
         "ImportanceOfBeingErnest",
         "TheCantervilleGhost")
 
@@ -50,18 +51,17 @@ object NaiveBayesDocumentClassifier {
 
     val possibleAuthors = authorsToPctTrainingSamples.keys.toSet
 
+    // instead of going through each word, get counts and then use them as exponents!
+
     def classifyNewDoc(docPath: String): BritishAuthor = {
       val fileText = getWordSequenceFromLocalFile(docPath)
+      val wordCounts = getCounts(fileText)
       val authorsToLikelihoods = possibleAuthors map { possibleAuthor =>
         val logPAuthor = math.log(authorsToPctTrainingSamples(possibleAuthor))
-        val logLikelihoods = fileText map { x =>
-          val res = logLikelihoodOfSeeingWordGivenAuthor(x, possibleAuthor)
-          //println("likelihood of " + x+ " given " + possibleAuthor + " is " + res)
-          res
+        val logLikelihoods = wordCounts map { case (word, count) =>
+          count *  logLikelihoodOfSeeingWordGivenAuthor(word, possibleAuthor)
         }
-        val totalLogLikelihood = logLikelihoods reduce { _ + _ }
-        println((possibleAuthor, totalLogLikelihood + logPAuthor))
-        (possibleAuthor, totalLogLikelihood + logPAuthor)
+        (possibleAuthor, logLikelihoods.sum + logPAuthor)
       }
       println(authorsToLikelihoods)
       authorsToLikelihoods.maxBy{ _._2 }._1
@@ -73,10 +73,13 @@ object NaiveBayesDocumentClassifier {
   val classifier: BritClassifier = getClassifierFromTrainingData(_)
 
   def main(args: Array[String]) {
-    val trainedClassifier = classifier(trainingTextFileNamesAndClassifications)
-    val classified = textFileNamesToClassify map { fileName =>
-      (fileName, ("Classification\\" + fileName + ".txt") |> trainedClassifier)
-    }
-    println(classified)
-  }
+    //for (x <- 1 to 1000) {
+      val trainedClassifier = classifier(trainingTextFileNamesAndClassifications)
+      val classified = textFileNamesToClassify map { fileName =>
+        (fileName, ("Classification\\" + fileName + ".txt") |> trainedClassifier)
+      }
+      println(classified)
+    
+   }
+  //}
 }
