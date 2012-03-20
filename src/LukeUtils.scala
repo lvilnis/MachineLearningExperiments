@@ -13,7 +13,7 @@ object LukeUtils {
     printToFile(new File(path)) { _.print(contents) }
   }
 
-  val localPath = "C:\\Users\\Luke\\Desktop\\Files For Machine Learning\\";
+  val localPath = "inputs\\";
 
   def readLocalTextFile(path: String): String =
     readTextFile(localPath + path)
