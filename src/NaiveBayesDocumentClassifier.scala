@@ -73,7 +73,7 @@ object NaiveBayesDocumentClassifier {
   val classifier: BritClassifier = getClassifierFromTrainingData(_)
 
   def main(args: Array[String]) {
-    //for (x <- 1 to 1000) {
+    //for (x <- 1 to 1000) { 
       val trainedClassifier = classifier(trainingTextFileNamesAndClassifications)
       val classified = textFileNamesToClassify map { fileName =>
         (fileName, ("Classification\\" + fileName + ".txt") |> trainedClassifier)
