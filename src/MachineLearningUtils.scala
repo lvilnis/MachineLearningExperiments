@@ -62,6 +62,20 @@ object MachineLearningUtils {
 
   type Dist[+T] = () => T
 
+  def dist[T](body: => T): Dist[T] = () => { body }
+
+  def uniform: Dist[Double] = dist { scala.math.random }
+
+  trait DistWrapper[+T] {
+    def d: Dist[T]
+    def flatMap[U](mapper: T => Dist[U]): Dist[U] = dist { mapper(d())() }
+    def map[U](mapper: T => U): Dist[U] = dist { mapper(d()) }
+  }
+
+  implicit def dist2Wrapper[T](toWrap: Dist[T]): DistWrapper[T] = new DistWrapper[T] {
+    val d = toWrap
+  }
+
   def getWeightedCasesDistribution[T](weightedCases: Seq[(T, Double)]): Dist[T] = {
     val cases = weightedCases map { _._1 }
     val weights = weightedCases map { _._2 }
@@ -70,10 +84,16 @@ object MachineLearningUtils {
     val probs = summedWeights map { _ / sumOfWeights }
     val casesAndProbs = cases zip probs
 
-    () => {
-      val roll = scala.math.random
-      casesAndProbs find { case (_, prob) => prob > roll } map { _._1 } getOrElse (sys.error("Impossible!"))
-    }
+//    dist {
+//      val roll = scala.math.random
+//      val caseChoice = casesAndProbs find { case (_, prob) => prob > roll }
+//      caseChoice.get._1
+//    }
+
+    for {
+      roll <- uniform
+      val caseChoice = casesAndProbs find { case (_, prob) => prob > roll }
+    } yield caseChoice.get._1
   }
 
   // A Classifier is a function which given a set of
