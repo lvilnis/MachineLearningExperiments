@@ -23,9 +23,15 @@ object LukeUtils {
 
   class Pipeable[A](a: A) {
     def |>[B](f: A => B) = f(a)
+    def <|:[B](f: A => B) = f(a)
+  }
+
+  class Vectorable[A](a: Iterable[A]) {
+    def toVector: Vector[A] = Vector(a.toSeq: _*)
   }
 
   implicit def convert[A](s: A) = new Pipeable(s)
+  implicit def convert[A](s: Iterable[A]) = new Vectorable(s)
 
   def groupPairsByFirst[A, B](set: Seq[(A, B)]): Map[A, Seq[B]] =
     set groupBy { _._1 } mapValues { _.toSeq map { _._2 } }

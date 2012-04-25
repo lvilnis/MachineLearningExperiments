@@ -17,26 +17,21 @@ object MachineLearningUtils {
   def getWordSequenceFromString(str: String): Seq[String] =
     str.toLowerCase filter { c => c.isLetter || c.isSpaceChar } split "\\s+"
 
-  def getCounts[T: ClassManifest](items: Seq[T]): Map[T, Int] = {
-
+  def getCounts[T](items: Seq[T]): Map[T, Int] = {
    // return items groupBy identity mapValues { _.length };
 
-    val itemsArray = items.toArray
+    val iterator = items.iterator
     val counts = new scala.collection.mutable.HashMap[T, Int]
-    val length = itemsArray.length
 
-    var counter = 0
-    while(counter < length) {
-      val current = itemsArray(counter)
+    while(iterator.hasNext) {
+      val current = iterator.next()
       counts.update(current, counts.getOrElse(current, 0) + 1)
-      counter += 1
     }
 
     counts.toMap
   }
-  //  items groupBy identity mapValues { _.length }
 
-  def getCountsDouble[T:ClassManifest](items: Seq[T]): Map[T, Double] =
+  def getCountsDouble[T](items: Seq[T]): Map[T, Double] =
     getCounts(items) mapValues { _.asInstanceOf[Double] }
 
   def getWordsAndCountsFromLocalFile(fileName: String): Map[String, Int] =
