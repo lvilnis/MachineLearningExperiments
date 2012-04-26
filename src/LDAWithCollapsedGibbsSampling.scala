@@ -1,11 +1,10 @@
 import LukeUtils._
 import MachineLearningUtils._
+import scala.Predef._
 
 object LDAWithCollapsedGibbsSampling {
 
-  def inferTopics(documents: Vector[Vector[String]], numTopics: Int): Seq[Seq[String]] = {
-
-    import scala.collection._
+  def inferTopics(documents: Array[Array[String]], numTopics: Int): Seq[Seq[String]] = {
 
     val distinctWords = documents.flatten.distinct
     val distinctWordToIndex = distinctWords.zipWithIndex.toMap
@@ -17,16 +16,11 @@ object LDAWithCollapsedGibbsSampling {
 
     val M = documents.length
     val K = numTopics
-    val y = new Array[Array[Int]](M)
-    documents.zipWithIndex flatMap {
-      case (doc, docIdx) =>
-        y(docIdx) = new Array[Int](doc.length)
-        doc.zipWithIndex map {
-          case (word, wordIdx) =>
-            y(docIdx)(wordIdx) = distinctWordToIndex(word)
-        }
-    }
     val J = distinctWords.length
+    val y = Array.tabulate(M) { di =>
+      val doc = documents(di)
+      Array.tabulate(doc.length) { wi => distinctWordToIndex(doc(wi)) }
+    }
 
     // alpha is the prior distribution over topics (whatever this means...)
     // beta is the prior distribution over words (whatever this means...)
@@ -37,20 +31,13 @@ object LDAWithCollapsedGibbsSampling {
 
     // z(m, n) is the topic of the n'th word in the m'th document
     // c(k, m, j) is number of times word j is assigned to topic k in document m
-    val z = new Array[Array[Int]](M)
-    val c = Array.fill(K)(Array.fill(M)(Array.fill(J)(0)))
 
     // use a uniform random initial assignment of topic to each word z(_, _)
-    for (doc <- 0 to M - 1) {
-      val docLength = documents(doc).length
-      z(doc) = new Array[Int](docLength)
-      for (word <- 0 to docLength - 1)
-        z(doc)(word) = scala.util.Random.nextInt(K)
+    val z = Array.tabulate(M) { di =>
+      Array.tabulate(documents(di).length) { _ => scala.util.Random.nextInt(K) }
     }
-
     // first fill c(_, _, _) with zeroes
-    for (wordIdx <- 0 to J - 1; docIdx <- 0 to M - 1; topicIdx <- 0 to K - 1)
-      c(topicIdx)(docIdx)(wordIdx) = 0
+    val c = Array.fill(K, M, J)(0)
 
     // update the word counts in c(_, _, _) according to our initial z(_, _):
     for (doc <- 0 to M - 1) {
@@ -76,36 +63,18 @@ object LDAWithCollapsedGibbsSampling {
       while (i < M - 1) { sum += c(topic)(i)(word); i += 1 }
       sum
     }
-    def sumOverTopics(c: Array[Array[Array[Int]]], doc: Int, word: Int): Int = {
-      var sum, i = 0
-      while (i < K - 1) { sum += c(i)(doc)(word); i += 1 }
-      sum
-    }
     def sumOverWordsAndDocs(c: Array[Array[Array[Int]]], topic: Int): Int = {
-      var sum, i, j = 0
-      while ((i < M - 1) && (j < J - 1)) { sum += c(topic)(i)(j); i += 1; j += 1 }
+      var sum, i = 0
+      while (i < M - 1) {
+        var j = 0
+        while (j < J - 1) { sum += c(topic)(i)(j); j += 1 }
+        i += 1
+      }
       sum
     }
 
-    // calculate the denominator of the probability of some topic assignment z(a, b)
-    // we can leave this out since it's independent of the test topic
-//    def calculateProbabilityDenominator(docIdx: Int, wordIdx: Int): Double = {
-//      sumOverTopics { k =>
-//        val cSumOverWords = sumOverWords { c(k, docIdx, _) }
-//        val alphaForTopic = alpha(k)
-//
-//        val cSumOverDocs = sumOverDocs { c(k, _, wordIdx) }
-//        val betaForWord = beta(wordIdx)
-//
-//        val cSumOverWordsAndDocs = sumOverWordsAndDocs { c(k, _, _) }
-//
-//        (cSumOverWords + alphaForTopic) * (cSumOverDocs + betaForWord) /
-//        (cSumOverWordsAndDocs + gamma * J)
-//      }
-//    }
-
-    // calculate the numerator of the probability of some topic assignment z(a, b)
-    def calculateProbabilityNumerator(testTopic: Int, docIdx: Int, wordIdx: Int): Double = {
+    // calculate the likelihood of some topic assignment z(a, b)
+    def calculateTopicLikelihood(testTopic: Int, docIdx: Int, wordIdx: Int): Double = {
       val cSumOverWords = sumOverWords(c, testTopic, docIdx)
       val alphaForOldTopic = alpha(testTopic)
 
@@ -133,11 +102,11 @@ object LDAWithCollapsedGibbsSampling {
 
         var i = 0
         while (i < numTopics - 1) {
-          topicLikelihoods(i) = calculateProbabilityNumerator(i, docIdx, wordIdx)
+          topicLikelihoods(i) = calculateTopicLikelihood(i, docIdx, wordIdx)
           i += 1
         }
 
-        println(topicLikelihoods.toList)
+        //println(topicLikelihoods.toList)
 
         // find the most likely topic assignment for the current doc-word
         // pick the next topic assignment according to the probabilities
@@ -176,12 +145,12 @@ object LDAWithCollapsedGibbsSampling {
       .toList
   }
 
-  def turnDocsIntoBagsOfWords(docs: Seq[String]): Vector[Vector[String]] =
-    docs .map { doc => getWordSequenceFromString(doc).toVector } .toVector
+  def turnDocsIntoBagsOfWords(docs: Seq[String]): Array[Array[String]] =
+    docs .map { doc => getWordSequenceFromString(doc).toArray } .toArray
 
   def main(args: Array[String]) {
     val numTopics = 10
-    val numDocs = 50
+    val numDocs = 30
     val fileText = readLocalTextFile("/Topics/ap.txt")
     println(fileText)
     val documents = extractDocumentsFromFile(fileText)
@@ -190,7 +159,7 @@ object LDAWithCollapsedGibbsSampling {
     println(bagsOfWords take numDocs)
     // note: get rid of most common words before this
     val results = inferTopics(bagsOfWords take numDocs, numTopics)
-    val betterResults = results map { topic => getCounts(topic).toSeq sortBy { -_._2 } drop 50 map { _._1 } }
+    val betterResults = results map { topic => getCounts(topic).toSeq sortBy { -_._2 } map { _._1 } }
     println(betterResults)
   }
 }
