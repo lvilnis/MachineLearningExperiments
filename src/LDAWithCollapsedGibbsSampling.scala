@@ -17,114 +17,147 @@ object LDAWithCollapsedGibbsSampling {
 
     val M = documents.length
     val K = numTopics
-    val y = documents.zipWithIndex.flatMap {
-      case (doc, docIdx) => doc.zipWithIndex.map {
-        case (word, wordIdx) => ((docIdx, wordIdx), distinctWordToIndex(word))
-      }
-    }.toMap
+    val y = new Array[Array[Int]](M)
+    documents.zipWithIndex flatMap {
+      case (doc, docIdx) =>
+        y(docIdx) = new Array[Int](doc.length)
+        doc.zipWithIndex map {
+          case (word, wordIdx) =>
+            y(docIdx)(wordIdx) = distinctWordToIndex(word)
+        }
+    }
     val J = distinctWords.length
 
     // alpha is the prior distribution over topics (whatever this means...)
     // beta is the prior distribution over words (whatever this means...)
-    // gamma is the component value of alpha/beta since we're using flat priors
+    // gamma is the component value of beta since we're using flat prior
     val gamma = 0.1
-    val alpha = Array.fill(K)(gamma)
+    val alpha = Array.fill(K)(50 / K)
     val beta = Array.fill(J)(gamma)
 
     // z(m, n) is the topic of the n'th word in the m'th document
     // c(k, m, j) is number of times word j is assigned to topic k in document m
-    val z = mutable.Map.empty[(Int, Int), Int]
-    val c = mutable.Map.empty[(Int, Int, Int), Int]
+    val z = new Array[Array[Int]](M)
+    val c = Array.fill(K)(Array.fill(M)(Array.fill(J)(0)))
 
     // use a uniform random initial assignment of topic to each word z(_, _)
-    y foreach { case (docAndWord, _) =>
-        z(docAndWord) = scala.util.Random.nextInt(K)
+    for (doc <- 0 to M - 1) {
+      val docLength = documents(doc).length
+      z(doc) = new Array[Int](docLength)
+      for (word <- 0 to docLength - 1)
+        z(doc)(word) = scala.util.Random.nextInt(K)
     }
 
     // first fill c(_, _, _) with zeroes
-    for (wordIdx <- 1 to J; docIdx <- 1 to M; topicIdx <- 1 to K)
-      c((topicIdx - 1, docIdx - 1, wordIdx - 1)) = 0
+    for (wordIdx <- 0 to J - 1; docIdx <- 0 to M - 1; topicIdx <- 0 to K - 1)
+      c(topicIdx)(docIdx)(wordIdx) = 0
 
     // update the word counts in c(_, _, _) according to our initial z(_, _):
-    y foreach { case ((docIdx, docWordIdx), wordIdx) =>
-      val wordTopic = z((docIdx, docWordIdx))
-      c((wordTopic, docIdx, wordIdx)) += 1
+    for (doc <- 0 to M - 1) {
+      val docLength = documents(doc).length
+      for (word <- 0 to docLength - 1) {
+        val wordTopic = z(doc)(word)
+        val wordIdx = y(doc)(word)
+        c(wordTopic)(doc)(wordIdx) += 1
+      }
     }
 
     // now for each doc-word (a, b), we calculate the most likely topic given all the
     // other topic assignments
 
     // Methods for summing over various indices
-    def sumOverWords(f: Int => Double): Double = (0 to J - 1).map(f).sum
-    def sumOverDocs(f: Int => Double): Double = (0 to M - 1).map(f).sum
-    def sumOverTopics(f: Int => Double): Double = (0 to K - 1).map(f).sum
-    def sumOverWordsAndDocs(f: (Int, Int) => Double): Double =
-      sumOverWords{ w => sumOverDocs{ d => f(d, w) } }
+    def sumOverWords(c: Array[Array[Array[Int]]], topic: Int, doc: Int): Int = {
+      var sum, i = 0
+      while (i < J - 1) { sum += c(topic)(doc)(i); i += 1 }
+      sum
+    }
+    def sumOverDocs(c: Array[Array[Array[Int]]], topic: Int, word: Int): Int = {
+      var sum, i = 0
+      while (i < M - 1) { sum += c(topic)(i)(word); i += 1 }
+      sum
+    }
+    def sumOverTopics(c: Array[Array[Array[Int]]], doc: Int, word: Int): Int = {
+      var sum, i = 0
+      while (i < K - 1) { sum += c(i)(doc)(word); i += 1 }
+      sum
+    }
+    def sumOverWordsAndDocs(c: Array[Array[Array[Int]]], topic: Int): Int = {
+      var sum, i, j = 0
+      while ((i < M - 1) && (j < J - 1)) { sum += c(topic)(i)(j); i += 1; j += 1 }
+      sum
+    }
 
     // calculate the denominator of the probability of some topic assignment z(a, b)
     // we can leave this out since it's independent of the test topic
-    def calculateProbabilityDenominator(docIdx: Int, wordIdx: Int): Double = {
-      sumOverTopics { k =>
-        val cSumOverWords = sumOverWords { c(k, docIdx, _) }
-        val alphaForTopic = alpha(k)
-
-        val cSumOverDocs = sumOverDocs { c(k, _, wordIdx) }
-        val betaForWord = beta(wordIdx)
-
-        val cSumOverWordsAndDocs = sumOverWordsAndDocs { c(k, _, _) }
-
-        (cSumOverWords + alphaForTopic) * (cSumOverDocs + betaForWord) /
-        (cSumOverWordsAndDocs + gamma * J)
-      }
-    }
+//    def calculateProbabilityDenominator(docIdx: Int, wordIdx: Int): Double = {
+//      sumOverTopics { k =>
+//        val cSumOverWords = sumOverWords { c(k, docIdx, _) }
+//        val alphaForTopic = alpha(k)
+//
+//        val cSumOverDocs = sumOverDocs { c(k, _, wordIdx) }
+//        val betaForWord = beta(wordIdx)
+//
+//        val cSumOverWordsAndDocs = sumOverWordsAndDocs { c(k, _, _) }
+//
+//        (cSumOverWords + alphaForTopic) * (cSumOverDocs + betaForWord) /
+//        (cSumOverWordsAndDocs + gamma * J)
+//      }
+//    }
 
     // calculate the numerator of the probability of some topic assignment z(a, b)
     def calculateProbabilityNumerator(testTopic: Int, docIdx: Int, wordIdx: Int): Double = {
-      val cSumOverWords = sumOverWords { c(testTopic, docIdx, _) }
+      val cSumOverWords = sumOverWords(c, testTopic, docIdx)
       val alphaForOldTopic = alpha(testTopic)
 
-      val cSumOverDocs = sumOverDocs { c(testTopic, _, wordIdx) }
+      val cSumOverDocs = sumOverDocs(c, testTopic, wordIdx)
       val betaForWord = beta(wordIdx)
 
-      val cSumOverWordsAndDocs = sumOverWordsAndDocs { c(testTopic, _, _) }
+      val cSumOverWordsAndDocs = sumOverWordsAndDocs(c, testTopic)
 
       (cSumOverWords + alphaForOldTopic) * (cSumOverDocs + betaForWord) /
       (cSumOverWordsAndDocs + gamma * J)
     }
 
-    for (assignment <- 1 to 1) {
-      y foreach { case ((docIdx, docWordIdx), wordIdx) =>
+    for (assignment <- 1 to 20) {
+      for (docIdx <- 0 to (y.length - 1); docWordIdx <- 0 to (y(docIdx).length - 1)) {
+        val wordIdx = y(docIdx)(docWordIdx)
 
         // first, we decrement the count in c to exclude the current doc-word
-        val oldWordTopic = z((docIdx, docWordIdx))
-        c((oldWordTopic, docIdx, wordIdx)) -= 1
+        val oldWordTopic = z(docIdx)(docWordIdx)
+        c(oldWordTopic)(docIdx)(wordIdx) -= 1
 
         // now we determine the likelihood that the current doc-word has each topic
         // we're ignoring the denominator because we just want the most likely one
         // and don't need the probabilities to be normalized
         val topicLikelihoods = Array.fill(numTopics)(0.0)
 
-        for (testTopic <- 0 to numTopics - 1) {
-          val numerator = calculateProbabilityNumerator(testTopic, docIdx, wordIdx)
-          topicLikelihoods(testTopic) = numerator
+        var i = 0
+        while (i < numTopics - 1) {
+          topicLikelihoods(i) = calculateProbabilityNumerator(i, docIdx, wordIdx)
+          i += 1
         }
 
-        // find the most likely topic assignment for the current doc-word
-        val newZ = topicLikelihoods.zipWithIndex.maxBy{ _._1 }._2
+        println(topicLikelihoods.toList)
 
-        z((docIdx, docWordIdx)) = newZ
-        c((newZ, docIdx, wordIdx)) += 1
+        // find the most likely topic assignment for the current doc-word
+        // pick the next topic assignment according to the probabilities
+        val newZ = MachineLearningUtils.getWeightedCasesDistribution(topicLikelihoods.zipWithIndex.map(x => (x._2, x._1)))()
+
+        z(docIdx)(docWordIdx) = newZ
+        c(newZ)(docIdx)(wordIdx) += 1
       }
     }
 
     // now, print out all the topics:
 
-    val topics = z.toSeq map {
-      case ((docIdx, docWordIdx), topicIdx) => (topicIdx, distinctWords(y(docIdx, docWordIdx)))
+    val topics = z.zipWithIndex.toSeq flatMap { case (doc, docIdx) =>
+      doc.zipWithIndex map { case (topic, wordIdx) =>
+        (topic, distinctWords(y(docIdx)(wordIdx)))
+      }
     } groupBy {
-      x => x._1
+    x => x._1
     } mapValues {
-      _ map { _._2 }
+    _ map { _._2 }
     }
 
     println(topics)
@@ -147,8 +180,8 @@ object LDAWithCollapsedGibbsSampling {
     docs .map { doc => getWordSequenceFromString(doc).toVector } .toVector
 
   def main(args: Array[String]) {
-    val numTopics = 5
-    val numDocs = 20
+    val numTopics = 10
+    val numDocs = 50
     val fileText = readLocalTextFile("/Topics/ap.txt")
     println(fileText)
     val documents = extractDocumentsFromFile(fileText)
