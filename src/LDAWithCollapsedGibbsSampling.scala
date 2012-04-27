@@ -44,20 +44,17 @@ object LDAWithCollapsedGibbsSampling {
     val cOverWordsAndDocs = Array.fill(K)(0)
 
     // update the word counts in c(_, _, _) according to our initial z(_, _):
-    for (doc <- 0 to M - 1) {
-      val docLength = documents(doc).length
-      for (word <- 0 to docLength - 1) {
-        val wordTopic = z(doc)(word)
-        val wordIdx = y(doc)(word)
-        cOverWords(wordTopic)(doc) += 1
-        cOverDocs(wordTopic)(wordIdx) += 1
-        cOverWordsAndDocs(wordTopic) += 1
-        c(wordTopic)(doc)(wordIdx) += 1
-      }
+    for (doc <- 0 until M; docWord <- 0 until z(doc).length) {
+      val topic = z(doc)(docWord)
+      val word = y(doc)(docWord)
+      cOverWords(topic)(doc) += 1
+      cOverDocs(topic)(word) += 1
+      cOverWordsAndDocs(topic) += 1
+      c(topic)(doc)(word) += 1
     }
 
-    for (assignment <- 1 to 500) {
-      for (docIdx <- 0 to (y.length - 1); docWordIdx <- 0 to (y(docIdx).length - 1)) {
+    for (assignment <- 1 to 1000) {
+      for (docIdx <- 0 until M; docWordIdx <- 0 until z(docIdx).length) {
         val wordIdx = y(docIdx)(docWordIdx)
 
         // first, we decrement the count in c to exclude the current doc-word
@@ -74,7 +71,7 @@ object LDAWithCollapsedGibbsSampling {
         // now for each doc-word (a, b), we calculate the most likely topic given all the
         // other topic assignments
         var topicIdx = 0
-        while (topicIdx < numTopics - 1) {
+        while (topicIdx < numTopics) {
           topicLikelihoods(topicIdx) =
             (cOverWords(topicIdx)(docIdx) + alpha(topicIdx)) *
             (cOverDocs(topicIdx)(wordIdx) + beta(wordIdx)) /
@@ -129,8 +126,8 @@ object LDAWithCollapsedGibbsSampling {
     withoutCommonWords.map(_.toArray).toArray
   }
   def main(args: Array[String]) {
-    val numTopics = 30
-    val numDocs = 30
+    val numTopics = 50
+    val numDocs = 200
     val skipMostCommonWords = 100
     val fileText = readLocalTextFile("/Topics/ap.txt")
     println(fileText)
