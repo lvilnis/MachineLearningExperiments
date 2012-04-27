@@ -54,15 +54,16 @@ object LDAWithCollapsedGibbsSampling {
     }
 
     for (assignment <- 1 to 1000) {
-      for (docIdx <- 0 until M; docWordIdx <- 0 until z(docIdx).length) {
-        val wordIdx = y(docIdx)(docWordIdx)
+      for (doc <- 0 until M; docWord <- 0 until z(doc).length) {
+        val word = y(doc)(docWord)
 
         // first, we decrement the count in c to exclude the current doc-word
-        val oldWordTopic = z(docIdx)(docWordIdx)
-        c(oldWordTopic)(docIdx)(wordIdx) -= 1
-        cOverWords(oldWordTopic)(docIdx) -= 1
-        cOverDocs(oldWordTopic)(wordIdx) -= 1
-        cOverWordsAndDocs(oldWordTopic) -= 1
+        // we should pull these out to methods and see if they in-line... my guess is no because they're closures
+        val oldTopic = z(doc)(docWord)
+        c(oldTopic)(doc)(word) -= 1
+        cOverWords(oldTopic)(doc) -= 1
+        cOverDocs(oldTopic)(word) -= 1
+        cOverWordsAndDocs(oldTopic) -= 1
         // now we determine the likelihood that the current doc-word has each topic
         // we're ignoring the denominator because we just want the most likely one
         // and don't need the probabilities to be normalized
@@ -70,26 +71,23 @@ object LDAWithCollapsedGibbsSampling {
 
         // now for each doc-word (a, b), we calculate the most likely topic given all the
         // other topic assignments
-        var topicIdx = 0
-        while (topicIdx < numTopics) {
-          topicLikelihoods(topicIdx) =
-            (cOverWords(topicIdx)(docIdx) + alpha(topicIdx)) *
-            (cOverDocs(topicIdx)(wordIdx) + beta(wordIdx)) /
-            (cOverWordsAndDocs(topicIdx) + gamma * J)
-          topicIdx += 1
-        }
+        for (topic <- 0 until numTopics)
+          topicLikelihoods(topic) =
+            (cOverWords(topic)(doc) + alpha(topic)) *
+            (cOverDocs(topic)(word) + beta(word)) /
+            (cOverWordsAndDocs(topic) + gamma * J)
 
         //println(topicLikelihoods.toList)
 
         // find the most likely topic assignment for the current doc-word
         // pick the next topic assignment according to the probabilities
-        val newZ = MachineLearningUtils.getWeightedCasesDistribution(topicLikelihoods.zipWithIndex.map(x => (x._2, x._1)))()
+        val newTopic = MachineLearningUtils.getWeightedCasesDistribution(topicLikelihoods.zipWithIndex.map(x => (x._2, x._1)))()
 
-        z(docIdx)(docWordIdx) = newZ
-        c(newZ)(docIdx)(wordIdx) += 1
-        cOverWords(newZ)(docIdx) += 1
-        cOverDocs(newZ)(wordIdx) += 1
-        cOverWordsAndDocs(newZ) += 1
+        z(doc)(docWord) = newTopic
+        c(newTopic)(doc)(word) += 1
+        cOverWords(newTopic)(doc) += 1
+        cOverDocs(newTopic)(word) += 1
+        cOverWordsAndDocs(newTopic) += 1
       }
     }
 
@@ -126,8 +124,8 @@ object LDAWithCollapsedGibbsSampling {
     withoutCommonWords.map(_.toArray).toArray
   }
   def main(args: Array[String]) {
-    val numTopics = 50
-    val numDocs = 200
+    val numTopics = 30
+    val numDocs = 100
     val skipMostCommonWords = 100
     val fileText = readLocalTextFile("/Topics/ap.txt")
     println(fileText)
