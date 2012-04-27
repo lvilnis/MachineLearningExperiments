@@ -49,49 +49,11 @@ object LDAWithCollapsedGibbsSampling {
       for (word <- 0 to docLength - 1) {
         val wordTopic = z(doc)(word)
         val wordIdx = y(doc)(word)
-        cOverWords(doc)(wordTopic) += 1
+        cOverWords(wordTopic)(doc) += 1
+        cOverDocs(wordTopic)(wordIdx) += 1
+        cOverWordsAndDocs(wordTopic) += 1
         c(wordTopic)(doc)(wordIdx) += 1
       }
-    }
-
-    // now for each doc-word (a, b), we calculate the most likely topic given all the
-    // other topic assignments
-
-    // Methods for summing over various indices
-    def sumOverWords(c: Array[Array[Array[Int]]], topic: Int, doc: Int): Int = {
-      var sum, i = 0
-      while (i < J - 1) { sum += c(topic)(doc)(i); i += 1 }
-      sum
-    }
-    def sumOverDocs(c: Array[Array[Array[Int]]], topic: Int, word: Int): Int = {
-      var sum, i = 0
-      while (i < M - 1) { sum += c(topic)(i)(word); i += 1 }
-      sum
-    }
-    def sumOverWordsAndDocs(c: Array[Array[Array[Int]]], topic: Int): Int = {
-      var sum, i = 0
-      while (i < M - 1) {
-        var j = 0
-        while (j < J - 1) { sum += c(topic)(i)(j); j += 1 }
-        i += 1
-      }
-      sum
-    }
-
-    // calculate the likelihood of some topic assignment z(a, b)
-    def calculateTopicLikelihood(testTopic: Int, docIdx: Int, wordIdx: Int): Double = {
-
-      // we need to keep these sums pre-calculated
-      val cSumOverWords = sumOverWords(c, testTopic, docIdx)
-      val alphaForOldTopic = alpha(testTopic)
-
-      val cSumOverDocs = sumOverDocs(c, testTopic, wordIdx)
-      val betaForWord = beta(wordIdx)
-
-      val cSumOverWordsAndDocs = sumOverWordsAndDocs(c, testTopic)
-
-      (cSumOverWords + alphaForOldTopic) * (cSumOverDocs + betaForWord) /
-      (cSumOverWordsAndDocs + gamma * J)
     }
 
     for (assignment <- 1 to 500) {
@@ -101,16 +63,23 @@ object LDAWithCollapsedGibbsSampling {
         // first, we decrement the count in c to exclude the current doc-word
         val oldWordTopic = z(docIdx)(docWordIdx)
         c(oldWordTopic)(docIdx)(wordIdx) -= 1
-
+        cOverWords(oldWordTopic)(docIdx) -= 1
+        cOverDocs(oldWordTopic)(wordIdx) -= 1
+        cOverWordsAndDocs(oldWordTopic) -= 1
         // now we determine the likelihood that the current doc-word has each topic
         // we're ignoring the denominator because we just want the most likely one
         // and don't need the probabilities to be normalized
         val topicLikelihoods = Array.fill(numTopics)(0.0)
 
-        var i = 0
-        while (i < numTopics - 1) {
-          topicLikelihoods(i) = calculateTopicLikelihood(i, docIdx, wordIdx)
-          i += 1
+        // now for each doc-word (a, b), we calculate the most likely topic given all the
+        // other topic assignments
+        var topicIdx = 0
+        while (topicIdx < numTopics - 1) {
+          topicLikelihoods(topicIdx) =
+            (cOverWords(topicIdx)(docIdx) + alpha(topicIdx)) *
+            (cOverDocs(topicIdx)(wordIdx) + beta(wordIdx)) /
+            (cOverWordsAndDocs(topicIdx) + gamma * J)
+          topicIdx += 1
         }
 
         //println(topicLikelihoods.toList)
@@ -121,6 +90,9 @@ object LDAWithCollapsedGibbsSampling {
 
         z(docIdx)(docWordIdx) = newZ
         c(newZ)(docIdx)(wordIdx) += 1
+        cOverWords(newZ)(docIdx) += 1
+        cOverDocs(newZ)(wordIdx) += 1
+        cOverWordsAndDocs(newZ) += 1
       }
     }
 
