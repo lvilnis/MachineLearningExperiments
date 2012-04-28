@@ -36,8 +36,7 @@ object LDAWithCollapsedGibbsSampling {
     }
 
     // c(k, m, j) is number of times word j is assigned to topic k in document m
-    val c = Array.fill(K, M, J)(0)
-
+    // we don't need to create it - we're just gonna look at its cross sections
     // cj(k, m) is number of times any word is assigned topic k in document m
     // cm(k, j) is number of times word j is assigned topic k
     // cmj(k) is number of times any word is assigned topic k
@@ -49,7 +48,6 @@ object LDAWithCollapsedGibbsSampling {
       cj(topic)(doc) += update
       cm(topic)(word) += update
       cmj(topic) += update
-      c(topic)(doc)(word) += update
     }
 
     // update the word counts in c according to our initial z:
@@ -132,8 +130,8 @@ object LDAWithCollapsedGibbsSampling {
 
   def main(args: Array[String]) {
     timed("Inferred topics in %d ms" format _) {
-      val numTopics = 40
-      val numDocs = 240
+      val numTopics = 50
+      val numDocs = 500
       val skipMostCommonWords = 100
       val fileText = readLocalTextFile("/Topics/ap.txt")
       println(fileText)
