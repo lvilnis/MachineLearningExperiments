@@ -99,7 +99,7 @@ object LDAWithCollapsedGibbsSampling {
   }
 
   def pickTopic(topicLikelihoods: Array[Double]): Int = {
-    val sumOfLikelihoods = topicLikelihoods.sum
+    val sumOfLikelihoods = fastSum(topicLikelihoods)
     val rouletteSpin = scala.util.Random.nextDouble() * sumOfLikelihoods
     var currentSlot = topicLikelihoods(0)
     var topic = 0
@@ -129,10 +129,11 @@ object LDAWithCollapsedGibbsSampling {
     val withoutCommonWords = bags map { _ filterNot commonWordSet }
     withoutCommonWords.map(_.toArray).toArray
   }
+
   def main(args: Array[String]) {
     timed("Inferred topics in %d ms" format _) {
       val numTopics = 40
-      val numDocs = 120
+      val numDocs = 240
       val skipMostCommonWords = 100
       val fileText = readLocalTextFile("/Topics/ap.txt")
       println(fileText)

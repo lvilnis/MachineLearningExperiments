@@ -97,4 +97,14 @@ object MachineLearningUtils {
   type BinaryClassifier[Data] = Classifier[Data, Boolean]
   type DocumentClassifier[Label] = Classifier[String, Label]
 
+  // why do I have to write this myself, again? come on, Scala...
+  @inline def fastSum(arr: Array[Double]): Double = {
+    var sum = 0.0
+    var topic = 0
+    while (topic < arr.length) {
+      sum += arr(topic)
+      topic += 1
+    }
+    sum
+  }
 }
