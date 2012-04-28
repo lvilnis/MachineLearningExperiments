@@ -130,8 +130,8 @@ object LDAWithCollapsedGibbsSampling {
 
   def main(args: Array[String]) {
     timed("Inferred topics in %d ms" format _) {
-      val numTopics = 50
-      val numDocs = 500
+      val numTopics = 100
+      val numDocs = 2200
       val skipMostCommonWords = 100
       val fileText = readLocalTextFile("/Topics/ap.txt")
       println(fileText)
@@ -140,7 +140,9 @@ object LDAWithCollapsedGibbsSampling {
       val bagsOfWords = turnDocsIntoBagsOfWords(documents, skipMostCommonWords)
       // note: get rid of most common words before this
       val results = inferTopics(bagsOfWords, numTopics)
-      println(results map { getCounts(_).toSeq sortBy { -_._2 } map { _._1 } })
+      val cleanedUpResults = results map { getCounts(_).toSeq sortBy { -_._2 } map { _._1 } }
+      println(cleanedUpResults map { _ take 20 })
+      writeLocalTextFile("LDA results %d topics %d docs" format (numTopics, numDocs), cleanedUpResults.toString)
     }
   }
 }
