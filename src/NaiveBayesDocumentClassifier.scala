@@ -31,7 +31,7 @@ object NaiveBayesDocumentClassifier {
     val authorsAndWordSequences = trainingSet map { case (a, b) => (b, getWordSequenceFromLocalFile("Classification\\" + a + ".txt")) }
 
     val authorsToAllWords = groupPairsByFirst(authorsAndWordSequences.toSeq) mapValues { _ flatten }
-    val authorsToWordsAndCounts = authorsToAllWords mapValues { getCounts(_) }
+    val authorsToWordsAndCounts = authorsToAllWords mapValues { getCounts _ }
     val authorsToTotalWords = authorsToAllWords mapValues { _.length }
     val vocabulary = authorsToWordsAndCounts.values.map{ _.keys }.flatten.toSet
 
@@ -73,13 +73,12 @@ object NaiveBayesDocumentClassifier {
   val classifier: BritClassifier = getClassifierFromTrainingData(_)
 
   def main(args: Array[String]) {
-    //for (x <- 1 to 1000) { 
+    timed("Classified authors in %d ms" format _) {
       val trainedClassifier = classifier(trainingTextFileNamesAndClassifications)
       val classified = textFileNamesToClassify map { fileName =>
         (fileName, ("Classification\\" + fileName + ".txt") |> trainedClassifier)
       }
       println(classified)
-    
+    }
    }
-  //}
 }

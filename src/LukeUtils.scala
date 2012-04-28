@@ -36,4 +36,10 @@ object LukeUtils {
   def groupPairsByFirst[A, B](set: Seq[(A, B)]): Map[A, Seq[B]] =
     set groupBy { _._1 } mapValues { _.toSeq map { _._2 } }
 
+  def timed[T](showTime: Long => String)(body: => T) = {
+      val start = System.currentTimeMillis
+      val result = body
+      println(showTime(System.currentTimeMillis - start))
+      result
+  }
 }

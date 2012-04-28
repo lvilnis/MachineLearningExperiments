@@ -53,42 +53,46 @@ object LDAWithCollapsedGibbsSampling {
       c(topic)(doc)(word) += 1
     }
 
-    for (assignment <- 1 to 1000) {
-      for (doc <- 0 until M; docWord <- 0 until z(doc).length) {
-        val word = y(doc)(docWord)
+    // we'll reuse this array and overwrite it each go round
+    val topicLikelihoods = Array.fill(numTopics)(0.0)
 
-        // first, we decrement the count in c to exclude the current doc-word
-        // we should pull these out to methods and see if they in-line... my guess is no because they're closures
-        val oldTopic = z(doc)(docWord)
-        c(oldTopic)(doc)(word) -= 1
-        cOverWords(oldTopic)(doc) -= 1
-        cOverDocs(oldTopic)(word) -= 1
-        cOverWordsAndDocs(oldTopic) -= 1
-        // now we determine the likelihood that the current doc-word has each topic
-        // we're ignoring the denominator because we just want the most likely one
-        // and don't need the probabilities to be normalized
-        val topicLikelihoods = Array.fill(numTopics)(0.0)
+    for (assignment <- 1 to 1000;
+         doc <- 0 until M;
+         docWord <- 0 until z(doc).length) {
 
-        // now for each doc-word (a, b), we calculate the most likely topic given all the
-        // other topic assignments
-        for (topic <- 0 until numTopics)
-          topicLikelihoods(topic) =
-            (cOverWords(topic)(doc) + alpha(topic)) *
-            (cOverDocs(topic)(word) + beta(word)) /
-            (cOverWordsAndDocs(topic) + gamma * J)
+      val word = y(doc)(docWord)
 
-        //println(topicLikelihoods.toList)
+      // first, we decrement the count in c to exclude the current doc-word
+      // we should pull these out to methods and see if they in-line... my guess is no because they're closures
+      val oldTopic = z(doc)(docWord)
+      c(oldTopic)(doc)(word) -= 1
+      cOverWords(oldTopic)(doc) -= 1
+      cOverDocs(oldTopic)(word) -= 1
+      cOverWordsAndDocs(oldTopic) -= 1
 
-        // find the most likely topic assignment for the current doc-word
-        // pick the next topic assignment according to the probabilities
-        val newTopic = MachineLearningUtils.getWeightedCasesDistribution(topicLikelihoods.zipWithIndex.map(x => (x._2, x._1)))()
-
-        z(doc)(docWord) = newTopic
-        c(newTopic)(doc)(word) += 1
-        cOverWords(newTopic)(doc) += 1
-        cOverDocs(newTopic)(word) += 1
-        cOverWordsAndDocs(newTopic) += 1
+      // now we determine the likelihood that the current doc-word has each topic
+      // now for each doc-word (a, b), we calculate the most likely topic given all the
+      // other topic assignments
+      var topic = 0
+      while (topic < numTopics) {
+        topicLikelihoods(topic) =
+          (cOverWords(topic)(doc) + alpha(topic)) *
+          (cOverDocs(topic)(word) + beta(word)) /
+          (cOverWordsAndDocs(topic) + gamma * J)
+        topic += 1
       }
+
+      //println(topicLikelihoods.toList)
+
+      // find the most likely topic assignment for the current doc-word
+      // pick the next topic assignment according to the probabilities
+      val newTopic: Int = pickTopic(topicLikelihoods)
+
+      z(doc)(docWord) = newTopic
+      c(newTopic)(doc)(word) += 1
+      cOverWords(newTopic)(doc) += 1
+      cOverDocs(newTopic)(word) += 1
+      cOverWordsAndDocs(newTopic) += 1
     }
 
     // now, print out all the topics:
@@ -102,6 +106,18 @@ object LDAWithCollapsedGibbsSampling {
     println(topics)
 
     topics.toSeq map { _._2 }
+  }
+
+  def pickTopic(topicLikelihoods: Array[Double]): Int = {
+    val sumOfLikelihoods = topicLikelihoods.sum
+    val rouletteSpin = scala.util.Random.nextDouble() * sumOfLikelihoods
+    var currentSlot = topicLikelihoods(0)
+    var topic = 0
+    while (currentSlot < rouletteSpin) {
+      topic += 1
+      currentSlot += topicLikelihoods(topic)
+    }
+    topic
   }
 
   def extractDocumentsFromFile(text: String): Seq[String] = {
@@ -124,16 +140,18 @@ object LDAWithCollapsedGibbsSampling {
     withoutCommonWords.map(_.toArray).toArray
   }
   def main(args: Array[String]) {
-    val numTopics = 30
-    val numDocs = 100
-    val skipMostCommonWords = 100
-    val fileText = readLocalTextFile("/Topics/ap.txt")
-    println(fileText)
-    val documents = extractDocumentsFromFile(fileText) take numDocs
-    println(documents)
-    val bagsOfWords = turnDocsIntoBagsOfWords(documents, skipMostCommonWords)
-    // note: get rid of most common words before this
-    val results = inferTopics(bagsOfWords, numTopics)
-    println(results map { getCounts(_).toSeq sortBy { -_._2 } map { _._1 } })
+    timed("Inferred topics in %d ms" format _) {
+      val numTopics = 40
+      val numDocs = 120
+      val skipMostCommonWords = 100
+      val fileText = readLocalTextFile("/Topics/ap.txt")
+      println(fileText)
+      val documents = extractDocumentsFromFile(fileText) take numDocs
+      println(documents)
+      val bagsOfWords = turnDocsIntoBagsOfWords(documents, skipMostCommonWords)
+      // note: get rid of most common words before this
+      val results = inferTopics(bagsOfWords, numTopics)
+      println(results map { getCounts(_).toSeq sortBy { -_._2 } map { _._1 } })
+    }
   }
 }
