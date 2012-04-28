@@ -43,14 +43,18 @@ object LDAWithCollapsedGibbsSampling {
     val cOverDocs = Array.fill(K, J)(0)
     val cOverWordsAndDocs = Array.fill(K)(0)
 
+    @inline def updateTopicCounts(topic: Int, doc: Int, word: Int, update: Int): Unit = {
+      cOverWords(topic)(doc) += update
+      cOverDocs(topic)(word) += update
+      cOverWordsAndDocs(topic) += update
+      c(topic)(doc)(word) += update
+    }
+
     // update the word counts in c(_, _, _) according to our initial z(_, _):
     for (doc <- 0 until M; docWord <- 0 until z(doc).length) {
       val topic = z(doc)(docWord)
       val word = y(doc)(docWord)
-      cOverWords(topic)(doc) += 1
-      cOverDocs(topic)(word) += 1
-      cOverWordsAndDocs(topic) += 1
-      c(topic)(doc)(word) += 1
+      updateTopicCounts(topic, doc, word, 1)
     }
 
     // we'll reuse this array and overwrite it each go round
@@ -65,10 +69,7 @@ object LDAWithCollapsedGibbsSampling {
       // first, we decrement the count in c to exclude the current doc-word
       // we should pull these out to methods and see if they in-line... my guess is no because they're closures
       val oldTopic = z(doc)(docWord)
-      c(oldTopic)(doc)(word) -= 1
-      cOverWords(oldTopic)(doc) -= 1
-      cOverDocs(oldTopic)(word) -= 1
-      cOverWordsAndDocs(oldTopic) -= 1
+      updateTopicCounts(oldTopic, doc, word, -1)
 
       // now we determine the likelihood that the current doc-word has each topic
       // now for each doc-word (a, b), we calculate the most likely topic given all the
@@ -89,10 +90,7 @@ object LDAWithCollapsedGibbsSampling {
       val newTopic: Int = pickTopic(topicLikelihoods)
 
       z(doc)(docWord) = newTopic
-      c(newTopic)(doc)(word) += 1
-      cOverWords(newTopic)(doc) += 1
-      cOverDocs(newTopic)(word) += 1
-      cOverWordsAndDocs(newTopic) += 1
+      updateTopicCounts(newTopic, doc, word, 1)
     }
 
     // now, print out all the topics:
