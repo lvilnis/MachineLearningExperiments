@@ -10,20 +10,19 @@ object MarkovChainGenerator {
 
     val wordsToFollowingWordsAndCounts =
       pairsWithCounts.toSeq
-        .map { case ((a, b), num) => (a, (b, num)) }
-        .groupBy { case (a, (b, num)) => a }
-        .mapValues { _ map { case (a, (b, num)) => (b, num) } }
+        .map({ case ((a, b), num) => (a, (b, num)) })
+        .groupBy({ case (a, _) => a })
+        .mapValues(_.map({ case (_, (b, num)) => (b, num) }))
 
-    val sortedByFrequency =
-      wordsToFollowingWordsAndCounts mapValues { _ sortBy { _._2 } }
+    val sortedByFrequency = wordsToFollowingWordsAndCounts.mapValues(_.sortBy(_._2))
 
     var wordsToNextWordDists = Map(): Map[String, MachineLearningUtils.Dist[String]]
 
     def pickNext(word: String): String = {
       val possibleNextWordsAndWeights = sortedByFrequency(word)
       if (possibleNextWordsAndWeights.isEmpty) { return startWord }
-      wordsToNextWordDists = wordsToNextWordDists updated
-        (word, MachineLearningUtils.getWeightedCasesDistribution(possibleNextWordsAndWeights))
+      wordsToNextWordDists = wordsToNextWordDists.updated(
+        word, MachineLearningUtils.getWeightedCasesDistribution(possibleNextWordsAndWeights))
       wordsToNextWordDists(word)()
     }
 
@@ -34,6 +33,6 @@ object MarkovChainGenerator {
     val filePath = "MarkovChain\\WarAndPeace.txt"
     val chain = generateMarkovChainFromFile(filePath)
 
-    println(chain take 100 reduce { _ + " " + _ })
+    println(chain.take(100).reduce(_ + " " + _))
   }
 }

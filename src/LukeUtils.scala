@@ -8,9 +8,11 @@ object LukeUtils {
   def writeTextFile(path: String, contents: String): Unit = {
     def printToFile(f: java.io.File)(op: java.io.PrintWriter => Unit): Unit = {
       val p = new java.io.PrintWriter(f)
-      try { op(p) } finally { p.close() }
+      try op(p) finally p.close()
     }
-    printToFile(new File(path)) { _.print(contents) }
+    printToFile (new File(path)) { f =>
+      f.print(contents)
+    }
   }
 
   val localPath = "inputs\\";
@@ -34,7 +36,7 @@ object LukeUtils {
   implicit def convert[A](s: Iterable[A]) = new Vectorable(s)
 
   def groupPairsByFirst[A, B](set: Seq[(A, B)]): Map[A, Seq[B]] =
-    set groupBy { _._1 } mapValues { _.toSeq map { _._2 } }
+    set.groupBy(_._1).mapValues(_.toSeq.map(_._2))
 
   def timed[T](showTime: Long => String)(body: => T) = {
       val start = System.currentTimeMillis

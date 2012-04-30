@@ -17,9 +17,9 @@ object LDAWithCollapsedGibbsSampling {
     val M = documents.length
     val K = numTopics
     val J = distinctWords.length
-    val y = Array.tabulate(M) { di =>
+    val y = Array.tabulate (M) { di =>
       val doc = documents(di)
-      Array.tabulate(doc.length) { wi => distinctWordToIndex(doc(wi)) }
+      Array.tabulate (doc.length) { wi => distinctWordToIndex(doc(wi)) }
     }
 
     // alpha is the prior distribution over topics
@@ -31,8 +31,8 @@ object LDAWithCollapsedGibbsSampling {
 
     // z(a, b) is the topic of the b'th word in the a'th document
     // use a uniform random initial assignment of topic to each word
-    val z = Array.tabulate(M) { di =>
-      Array.fill(documents(di).length) { scala.util.Random.nextInt(K) }
+    val z = Array.tabulate (M) { di =>
+      Array.fill (documents(di).length) { scala.util.Random.nextInt(K) }
     }
 
     // c(k, m, j) is number of times word j is assigned to topic k in document m
@@ -89,11 +89,13 @@ object LDAWithCollapsedGibbsSampling {
     }
 
     // now, group all the words into topics
-    val topicWordPairs = z.zipWithIndex.toSeq flatMap { case (doc, d) =>
-      doc.zipWithIndex map { case (t, w) => (t, distinctWords(y(d)(w))) }
-    }
-    val topics = topicWordPairs groupBy { _._1 } mapValues { _ map { _._2 } }
-    topics.toSeq map { _._2 }
+     val topicWordPairs = for {
+        (doc, d) <- z.zipWithIndex.toSeq
+        (t, w) <- doc.zipWithIndex
+      } yield (t, distinctWords(y(d)(w)))
+
+    val topics = topicWordPairs.groupBy(_._1).mapValues(_.map(_._2))
+    topics.toSeq.map(_._2)
   }
 
   def pickTopic(topicLikelihoods: Array[Double]): Int = {
@@ -114,34 +116,34 @@ object LDAWithCollapsedGibbsSampling {
     val escapedText = text.replace("&", "&amp;");
     val xmlDoc = XML.loadString("<?xml version=\"1.0\"?>\r\n<root>" + escapedText + "</root>")
     xmlDoc.child
-      .map { node => (node\"TEXT").text }
-      .filter { t => t != "" }
+      .map(x => (x\"TEXT").text)
+      .filter(_ != "")
       .toList
   }
 
   def turnDocsIntoBagsOfWords(docs: Seq[String], skipMostPopular: Int = 0): Array[Array[String]] = {
-    val bags = docs map { getWordSequenceFromString(_) }
+    val bags = docs.map(getWordSequenceFromString(_))
     val wordsAndCounts = getCounts(bags.flatten).toSeq
-    val mostCommonWords = wordsAndCounts sortBy { -_._2 } take skipMostPopular map { _._1 }
+    val mostCommonWords = wordsAndCounts.sortBy(-_._2).take(skipMostPopular).map(_._1)
     val commonWordSet = mostCommonWords.toSet
-    val withoutCommonWords = bags map { _ filterNot commonWordSet }
+    val withoutCommonWords = bags.map(_.filterNot(commonWordSet))
     withoutCommonWords.map(_.toArray).toArray
   }
 
   def main(args: Array[String]) {
-    timed("Inferred topics in %d ms" format _) {
-      val numTopics = 100
-      val numDocs = 2200
+    timed ("Inferred topics in %d ms" format _) {
+      val numTopics = 50
+      val numDocs = 500
       val skipMostCommonWords = 100
       val fileText = readLocalTextFile("/Topics/ap.txt")
       println(fileText)
-      val documents = extractDocumentsFromFile(fileText) take numDocs
+      val documents = extractDocumentsFromFile(fileText).take(numDocs)
       println(documents)
       val bagsOfWords = turnDocsIntoBagsOfWords(documents, skipMostCommonWords)
       // note: get rid of most common words before this
       val results = inferTopics(bagsOfWords, numTopics)
-      val cleanedUpResults = results map { getCounts(_).toSeq sortBy { -_._2 } map { _._1 } }
-      println(cleanedUpResults map { _ take 20 })
+      val cleanedUpResults = results.map(t => getCounts(t).toSeq.sortBy(-_._2).map(_._1))
+      println(cleanedUpResults.map(_.take(20)))
       writeLocalTextFile("LDA results %d topics %d docs" format (numTopics, numDocs), cleanedUpResults.toString)
     }
   }
