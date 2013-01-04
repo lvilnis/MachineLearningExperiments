@@ -102,12 +102,12 @@ object LinearChainCRF {
       overStates(j => overStates(i => (score(i, j, nextObs) + lastViterbi(i)._1, i)).maxBy(_._1))
     val initialViterbi = initialFwd.map(f => (f, 0))
     val viterbis = obs.obs.scanLeft(initialViterbi)(calculateNextViterbi)
+    println(viterbis.flatMap(_.map({case (a,b) => a + ", " + b})))
     val lastV = viterbis.last
-    val restV = viterbis.dropRight(1)
+    val restV = viterbis.drop(2)
     val finalAssignment = lastV.zipWithIndex.maxBy(_._1._1)
     val finalBackpointer = finalAssignment._1._2
-    val finalIndex = finalAssignment._2
     val mapAssignment = restV.scanRight(finalBackpointer)((arr, ptr) => arr(ptr)._2)
-    Label(mapAssignment.drop(1))
+    Label(mapAssignment)
   }
 }
