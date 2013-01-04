@@ -36,7 +36,7 @@ object LinearChainCRF {
   case class Weights(obs: Seq[Double], markov: Seq[Double] /*, bias: Seq[Double] */)
   case class ObsMarkovFactor(obsIndex: Int, obs: Int, markov: Int)
   case class BiasFactor(labelIndex: Int, label: Int)
-  case class MarkovFactor(leftLabelIndex: Int, rightLabeIndex: Int, leftLabel: Int, rightLabel: Int)
+  case class MarkovFactor(leftLabelIndex: Int, rightLabelIndex: Int, leftLabel: Int, rightLabel: Int)
 
   def main(args: Array[String]): Unit = {
     // Do this stuff later, assume we're given labeled instances
@@ -71,19 +71,11 @@ object LinearChainCRF {
 
   def infer(obs: Observation, weights: Weights, labelDomain: Domain, obsDomain: Domain): Label = {
     val initialState = 0
-    val lookup = Array.fill(labelDomain.size * labelDomain.size * obsDomain.size)(Double.NaN)
 
     @inline def score(leftLabel: Int, rightLabel: Int, rightObs: Int): Double = {
-      val lookupIdx = obsDomain.size * labelDomain.size * leftLabel + labelDomain.size * rightLabel + rightObs
-      val score = lookup(lookupIdx)
-      if (!score.isNaN) score
-      else {
-        val markovScore = weights.markov(labelDomain.size * leftLabel + rightLabel)
-        val obsScore = weights.obs(obsDomain.size * rightLabel + rightObs)
-        val totalScore = markovScore + obsScore
-        lookup(lookupIdx) = totalScore
-        totalScore
-      }
+      val markovScore = weights.markov(labelDomain.size * leftLabel + rightLabel)
+      val obsScore = weights.obs(obsDomain.size * rightLabel + rightObs)
+      markovScore + obsScore
     }
 
     @inline def overStates[A: Manifest](fun: Int => A): Array[A] = Array.tabulate(labelDomain.size)(fun)
@@ -96,17 +88,15 @@ object LinearChainCRF {
     def calculateLastBackward(lastObs: Int, nextBackward: Array[Double]): Array[Double] =
       overStates(i => fastSum(overStates(j => score(i, j, lastObs) + nextBackward(j))))
     val initialBwd = overStates(_ => 1.0)
-    val backwardVars = obs.obs.scanRight(initialBwd)(calculateLastBackward).reverse
+    val backwardVars = obs.obs.scanRight(initialBwd)(calculateLastBackward)
 
     def calculateNextViterbi(lastViterbi: Array[(Double, Int)], nextObs: Int): Array[(Double, Int)] =
       overStates(j => overStates(i => (score(i, j, nextObs) + lastViterbi(i)._1, i)).maxBy(_._1))
-    val initialViterbi = initialFwd.map(f => (f, 0))
+    val initialViterbi = initialFwd.map((_, -1))
     val viterbis = obs.obs.scanLeft(initialViterbi)(calculateNextViterbi)
-    println(viterbis.flatMap(_.map({case (a,b) => a + ", " + b})))
     val lastV = viterbis.last
     val restV = viterbis.drop(2)
-    val finalAssignment = lastV.zipWithIndex.maxBy(_._1._1)
-    val finalBackpointer = finalAssignment._1._2
+    val (_, finalBackpointer) = lastV.maxBy(_._1)
     val mapAssignment = restV.scanRight(finalBackpointer)((arr, ptr) => arr(ptr)._2)
     Label(mapAssignment)
   }
