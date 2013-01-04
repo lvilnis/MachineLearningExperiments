@@ -52,23 +52,43 @@ object LinearChainCRF {
     val words = Seq("FOO", "BAR", "BAZ")
     val labels = Seq("GOOD", "BAD")
     val obsDomain = Domain()
-    val markovDomain = Domain()
+    val labelDomain = Domain()
     words.foreach(obsDomain.indexForWord(_))
-    labels.foreach(markovDomain.indexForWord(_))
+    labels.foreach(labelDomain.indexForWord(_))
     val markovWeights = Array(10.0, 2.0, 2.0, 10.0)
     val obsWeights = Array(10.0, 1.0, 1.0, 1.0, 10.0, 15.0)
     val weights = Weights(obsWeights, markovWeights)
-    val hiddenLabels = Seq("GOOD","GOOD","GOOD","GOOD","GOOD","GOOD","BAD","BAD","BAD","BAD","BAD", "GOOD", "GOOD")
-    val hiddenLabelIndices = hiddenLabels.map(markovDomain.indexForWord(_))
-    def generateWord(curLabel: Int): Int = sample(obsWeights.slice(curLabel * 3, curLabel * 3 + 3).zipWithIndex)
-    val generatedWords = hiddenLabelIndices.map(generateWord)
-    println(hiddenLabels)
-    println(generatedWords.map(obsDomain.wordForIndex(_)))
-    val mapEstimate = new Infer(weights, markovDomain, obsDomain).inferViterbi(Observation(generatedWords))
-    println(mapEstimate.labels.map(markovDomain.wordForIndex(_)))
+    val generatedWords = generateInstance(weights, labelDomain, obsDomain).obs
+    val mapEstimate = new Infer(weights, labelDomain, obsDomain).inferViterbi(generatedWords)
+    println(mapEstimate.labels.map(labelDomain.wordForIndex(_)))
+
+    val instances = for (_ <- 1 to 100) yield generateInstance(weights, labelDomain, obsDomain)
+
+    val learner = new Learn(labelDomain, obsDomain)
+
+    val learnedWeights = learner.learnWeights(instances)
+
+    println("Obs weights:")
+    learnedWeights.obs.foreach(println(_))
+    println("Markov weights:")
+    learnedWeights.markov.foreach(println(_))
+
+    val infer = new Infer(weights, labelDomain, obsDomain)
+    val mapEstimates = instances.map(_.obs).map(infer.inferViterbi(_))
+    val labeledInstances = instances.map(_.obs).zip(mapEstimates).map({case (o, l) => Instance(o, l)})
+    val matching = instances.zip(labeledInstances).filter({case (i, li) => i.labels.labels.sameElements(li.labels.labels)})
+    println("Accuracy: %f" format ((matching.size * 1.0) / instances.size))
+    labeledInstances.foreach(l => println(l.labels.labels.toSeq))
   }
 
-  class Learn(labelDomain: Domain, obsDomain: Domain, sgdPasses: Int = 5, learningRate: Double = 1.0, l2: Double = 0.01, initialState: Int = 0) {
+  def generateInstance(weights: Weights, labelDomain: Domain, obsDomain: Domain): Instance = {
+    val hiddenLabels = Seq("GOOD","GOOD","GOOD","GOOD","GOOD","GOOD","BAD","BAD","BAD","BAD","BAD", "GOOD", "GOOD")
+    val hiddenLabelIndices = hiddenLabels.map(labelDomain.indexForWord(_))
+    def generateWord(curLabel: Int): Int = sample(weights.obs.slice(curLabel * 3, curLabel * 3 + 3).zipWithIndex)
+    Instance(Observation(hiddenLabelIndices.map(generateWord)), Label(hiddenLabelIndices))
+  }
+
+  class Learn(labelDomain: Domain, obsDomain: Domain, sgdPasses: Int = 5, learningRate: Double = 0.01, l2: Double = 0.01, initialState: Int = 0) {
     def learnWeights(instances: Seq[Instance]): Weights = {
       val weights = Weights(Array.fill(labelDomain.size * obsDomain.size)(0.0), Array.fill(labelDomain.size * labelDomain.size)(0.0))
       val infer = new Infer(weights, labelDomain, obsDomain)
@@ -80,10 +100,12 @@ object LinearChainCRF {
           val curObs = inst.obs.obs(o)
           val curObsGradIdx = j * obsDomain.size + curObs
           val curMarkovGradIdx = j * labelDomain.size + i
-          obsGradient(curObsGradIdx) -= math.exp(marginal.prob(curObs, i, j))
-          markovGradient(curMarkovGradIdx) -= math.exp(marginal.prob(curObs, i, j))
+          val curProb = math.exp(marginal.prob(curObs, i, j))
+//          println("Marginal prob y_%d=%d y_%d=%d x_%d=%d is equal to %f" format (o - 1, i, o, j, o, curObs, curProb))
+          obsGradient(curObsGradIdx) -= curProb
+          markovGradient(curMarkovGradIdx) -= curProb
           if ((o == 0 && i == initialState && j == inst.labels.labels(o)) ||
-              (i == inst.labels.labels(o - 1) && j == inst.labels.labels(o))) {
+              (o != 0 && i == inst.labels.labels(o - 1) && j == inst.labels.labels(o))) {
             obsGradient(curObsGradIdx) += 1
             markovGradient(curMarkovGradIdx) += 1
           }
@@ -100,6 +122,7 @@ object LinearChainCRF {
     @inline def score(leftLabel: Int, rightLabel: Int, rightObs: Int): Double = {
       val markovScore = weights.markov(labelDomain.size * leftLabel + rightLabel)
       val obsScore = weights.obs(obsDomain.size * rightLabel + rightObs)
+//      println("Score: " + (markovScore + obsScore))
       markovScore + obsScore
     }
 
@@ -116,8 +139,15 @@ object LinearChainCRF {
       val initialBwd = overStates(_ => 0.0)
       val backwardVars = obs.obs.scanRight(initialBwd)(calculateLastBackward)
 
+//      println("forward vars")
+//      forwardVars.map(_.toSeq).foreach(println)
+//      println("backward vars")
+//      backwardVars.map(_.toSeq).foreach(println)
+
       val marginals = for (o <- 1 until forwardVars.size) yield
-        overStates(i => overStates(j => forwardVars(o - 1)(i) * score(i, j, obs.obs(o)) * backwardVars(o)(j)))
+        overStates(i => overStates(j => forwardVars(o - 1)(i) + score(i, j, obs.obs(o - 1)) + backwardVars(o)(j)))
+
+//      marginals.foreach(_.foreach(_.foreach(println)))
 
       Marginal(marginals)
     }
