@@ -1,4 +1,3 @@
-import annotation.tailrec
 import LukeUtils._
 
 object MachineLearningUtils {
@@ -40,7 +39,7 @@ object MachineLearningUtils {
     xs.sortBy(_ => scala.math.random)
 
   def randomlySwapTwoMapEntries[T, U](map: Map[T, U]): Map[T, U] = {
-    if (map.keys.toSeq.lengthCompare(2) < 0) return map;
+    if (map.keys.toSeq.lengthCompare(2) < 0) return map
     // eww, slow... just pick two random keys, don't sort all of them!!
     val Seq(k1, k2) = scramble(map.keys.toSeq).take(2)
     map.updated(k1, map(k2)).updated(k2, map(k1))
@@ -67,6 +66,17 @@ object MachineLearningUtils {
 
   implicit def dist2Wrapper[T](toWrap: Dist[T]): DistWrapper[T] = new DistWrapper[T] {
     val d = toWrap
+  }
+
+  @inline def logSumExp(arr: Array[Double]): Double = {
+    val max = arr.max
+    var sum = max
+    var i = 0
+    while (i < arr.length) {
+      sum += math.exp(arr(i) - max)
+      i += 1
+    }
+    sum
   }
 
   def sample(weightedCases: Seq[Double]): Int = {

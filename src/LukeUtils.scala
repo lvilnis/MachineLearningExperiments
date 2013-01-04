@@ -1,4 +1,6 @@
 import java.io.File
+import scala.collection.generic.CanBuildFrom
+import scala.collection.{IterableLike, mutable}
 
 object LukeUtils {
 
@@ -53,16 +55,13 @@ object LukeUtils {
     }
   }
 
-  @inline def logSumExp(arr: Array[Double]): Double = {
-    val max = arr.max
-    var sum = max
-    var i = 0
-    while (i < arr.length) {
-      sum += math.exp(arr(i) - max)
-      i += 1
-    }
-    sum
-  }
+  def maxIndex[A, B: Ordering](xs: Iterable[A])(fun: A => B): Int = xs.zipWithIndex.maxBy(t => fun(t._1))._2
+  def maxAndIndex[A: Ordering](xs: Iterable[A]): (A, Int) = xs.zipWithIndex.maxBy(t => t._1)
+
+  def average(xs: Iterable[Double]): Double = xs.sum / xs.size
+
+  def countSame[A](xs: Iterable[A], ys: Iterable[A]): Int = map2(xs, ys)(_ == _).count(identity)
+  def pctSame[A](xs: Iterable[A], ys: Iterable[A]): Double = countSame(xs, ys) * 1.0 / xs.size
 
   // why do I have to write this myself, again? come on, Scala...
   @inline def fastSum(arr: Array[Double]): Double = {
@@ -73,5 +72,28 @@ object LukeUtils {
       topic += 1
     }
     sum
+  }
+
+  def map2[A, B, C, This[A] <: Iterable[A]](xs: This[A], ys: Iterable[B])(fun: (A, B) => C)
+    (implicit bf: CanBuildFrom[This[C], C, This[C]]): This[C] = {
+    val xit = xs.iterator
+    val yit = ys.iterator
+    val output =  bf()
+    while (xit.hasNext && yit.hasNext) {
+      output += (fun(xit.next(), yit.next()))
+    }
+    output.result()
+  }
+
+  def map3[A, B, C, D, This[A] <: Iterable[A]](xs: This[A], ys: Iterable[B], zs: Iterable[C])(fun: (A, B, C) => D)
+    (implicit bf: CanBuildFrom[This[D], D, This[D]]): This[D] = {
+    val xit = xs.iterator
+    val yit = ys.iterator
+    val zit = zs.iterator
+    val output =  bf()
+    while (xit.hasNext && yit.hasNext && zit.hasNext) {
+      output += (fun(xit.next(), yit.next(), zit.next()))
+    }
+    output.result()
   }
 }

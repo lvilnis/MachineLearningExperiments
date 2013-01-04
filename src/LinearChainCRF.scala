@@ -82,10 +82,9 @@ object LinearChainCRF {
     val infer = new Infer(learnedWeights, labelDomain, obsDomain)
     val mapEstimates = instances.map(_.obs).map(infer.inferViterbi(_))
 //    mapEstimates.map(_.labels.toSeq).foreach(println)
-    val labeledInstances = instances.map(_.obs).zip(mapEstimates).map({case (o, l) => Instance(o, l)})
-    val matching = for ((i, li) <- instances.zip(labeledInstances)) yield
-      (for ((x, y) <- i.labels.labels.zip(li.labels.labels) if x == y) yield 1.0).length * 1.0 / (i.labels.labels.length)
-    println("Accuracy: %f" format (matching.sum / matching.length))
+    val labeledInstances = map2(instances.map(_.obs), mapEstimates)(Instance(_, _))
+    val matching = map2(instances, labeledInstances)((i, li) => pctSame(i.labels.labels, li.labels.labels))
+    println("Accuracy: %f" format average(matching))
 //    labeledInstances.foreach(l => println(l.labels.labels.toSeq))
   }
 
@@ -124,7 +123,7 @@ object LinearChainCRF {
   }
 
   class Learn(val labelDomain: Domain, val obsDomain: Domain, sgdPasses: Int = 20,
-    learningRate: Double = 0.01, l2: Double = 0.1) extends CrfHelpers {
+    learningRate: Double = 0.01, l2: Double = 0.01) extends CrfHelpers {
     def learnWeightsMaxLikelihood(instances: Seq[Instance]): Weights = {
       val weights = Weights(Array.fill(labelDomain.size * obsDomain.size)(0.0), Array.fill(labelDomain.size * labelDomain.size)(0.0))
       val infer = new Infer(weights, labelDomain, obsDomain)
@@ -212,14 +211,10 @@ object LinearChainCRF {
 
     def inferViterbi(obs: Observation): Label = {
       def calculateNextViterbi(lastViterbi: Array[(Double, Int)], nextObs: Int): Array[(Double, Int)] =
-        overStates(j => {
-          val scoredStates = overStates(i => (score(i, j, nextObs) + lastViterbi(i)._1, i))
-//          println(scoredStates.toSeq)
-          scoredStates.maxBy(_._1)
-        })
+        overStates(j => maxAndIndex(overStates(i => (score(i, j, nextObs) + lastViterbi(i)._1))))
       val initialViterbi = overStates(i => (score(initialState, i, obs.obs(0)), -1))
       val viterbis = obs.obs.scanLeft(initialViterbi)(calculateNextViterbi)
-      val (_, finalState) = viterbis.last.map(_._1).zipWithIndex.maxBy(_._1)
+      val finalState = maxIndex(viterbis.last)(_._1)
 //      viterbis.foreach(arr => println(arr.toSeq))
       val mapAssignment = viterbis.drop(2).scanRight(finalState)((arr, ptr) => arr(ptr)._2)
       Label(mapAssignment)
