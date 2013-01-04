@@ -47,6 +47,79 @@ object LukeUtils {
       result
   }
 
+  trait ArrayWrapper {
+    protected def arr: Array[Double]
+    def +(other: ArrayWrapper): ArrayWrapper = {
+      val output = Array.fill(arr.length)(0.0)
+      var i = 0
+      while (i < arr.length) {
+        output(i) = arr(i) + other.arr(i)
+        i += 1
+      }
+      wrapArray(output)
+    }
+    def *(other: ArrayWrapper): ArrayWrapper = {
+      val output = Array.fill(arr.length)(0.0)
+      var i = 0
+      while (i < arr.length) {
+        output(i) = arr(i) * other.arr(i)
+        i += 1
+      }
+      wrapArray(output)
+    }
+    def *(other: Double): ArrayWrapper = {
+      val output = Array.fill(arr.length)(0.0)
+      var i = 0
+      while (i < arr.length) {
+        output(i) = arr(i) * other
+        i += 1
+      }
+      wrapArray(output)
+    }
+    def +=(other: ArrayWrapper): this.type = {
+      var i = 0
+      while (i < arr.length) {
+        arr(i) += other.arr(i)
+        i += 1
+      }
+      this
+    }
+    def -=(other: ArrayWrapper): this.type = {
+      var i = 0
+      while (i < arr.length) {
+        arr(i) -= other.arr(i)
+        i += 1
+      }
+      this
+    }
+    def *=(other: ArrayWrapper): this.type = {
+      var i = 0
+      while (i < arr.length) {
+        arr(i) *= other.arr(i)
+        i += 1
+      }
+      this
+    }
+    def *=(other: Double): this.type = {
+      var i = 0
+      while (i < arr.length) {
+        arr(i) *= other
+        i += 1
+      }
+      this
+    }
+  }
+
+  implicit def wrapArray(a: Array[Double]): ArrayWrapper = new ArrayWrapper { def arr = a }
+
+  def mutate(x: Array[Double], y: Array[Double], fun: (Double, Double) => Double): Unit = {
+    var i = 0
+    while (i < x.length) {
+      x(i) = fun(x(i), y(i))
+      i += 1
+    }
+  }
+
   def add(x: Array[Double], y: Array[Double]): Unit = {
     var i = 0
     while (i < x.length) {

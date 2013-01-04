@@ -113,8 +113,8 @@ object LinearChainCRF {
       while (o < numObs) {
         val curObs = instance.obs.obs(o)
         val curState = instance.labels.labels(o)
-        markovStats(markovStatIdx(prevState, curState)) = 1
-        obsStats(obsStatIdx(curState, curObs)) = 1
+        markovStats(markovStatIdx(prevState, curState)) += 1
+        obsStats(obsStatIdx(curState, curObs)) += 1
         prevState = curState
         o += 1
       }
@@ -122,8 +122,8 @@ object LinearChainCRF {
     }
   }
 
-  class Learn(val labelDomain: Domain, val obsDomain: Domain, sgdPasses: Int = 20,
-    learningRate: Double = 0.01, l2: Double = 0.01) extends CrfHelpers {
+  class Learn(val labelDomain: Domain, val obsDomain: Domain, sgdPasses: Int = 200,
+    learningRate: Double = 0.1, l2: Double = 0.01) extends CrfHelpers {
     def learnWeightsMaxLikelihood(instances: Seq[Instance]): Weights = {
       val weights = Weights(Array.fill(labelDomain.size * obsDomain.size)(0.0), Array.fill(labelDomain.size * labelDomain.size)(0.0))
       val infer = new Infer(weights, labelDomain, obsDomain)
@@ -161,8 +161,11 @@ object LinearChainCRF {
         val obsGradient = Array.fill(labelDomain.size * obsDomain.size)(0.0)
         if (!map.labels.sameElements(inst.labels.labels)) {
           val (obsStats, markovStats) = getSufficientStatistics(inst)
-          add(markovGradient, markovStats)
-          add(obsGradient, obsStats)
+          markovGradient += markovStats
+          obsGradient += obsStats
+          val (mapObsStats, mapMarkovStats) = getSufficientStatistics(inst.copy(labels = map))
+          markovGradient -= mapMarkovStats
+          obsGradient -= mapObsStats
         }
 //        println("Obs grad:" + obsGradient.toSeq)
 //        println("Markov grad:" + markovGradient.toSeq)
