@@ -49,7 +49,6 @@ object LinearChainCRF {
 //    val obsDomain = Domain()
 //    val sentences = sentenceStrings.map(_.map(obsDomain.indexForWord(_)))
 
-
     val words = Seq("FOO", "BAR", "BAZ")
     val labels = Seq("GOOD", "BAD")
     val obsDomain = Domain()
@@ -67,9 +66,9 @@ object LinearChainCRF {
     println("map estimate:")
     printLabels(mapEstimate)
 
-    return
+//    return
 
-    val instances = for (_ <- 1 to 100) yield generateInstance(weights, labelDomain, obsDomain, 13, 0)
+    val instances = for (_ <- 1 to 100) yield generateInstance(weights, labelDomain, obsDomain, 25, 0)
 
     val learner = new Learn(labelDomain, obsDomain)
 
@@ -82,11 +81,12 @@ object LinearChainCRF {
 
     val infer = new Infer(learnedWeights, labelDomain, obsDomain)
     val mapEstimates = instances.map(_.obs).map(infer.inferViterbi(_))
-    mapEstimates.map(_.labels.toSeq).foreach(println)
+//    mapEstimates.map(_.labels.toSeq).foreach(println)
     val labeledInstances = instances.map(_.obs).zip(mapEstimates).map({case (o, l) => Instance(o, l)})
-    val matching = instances.zip(labeledInstances).filter({case (i, li) => i.labels.labels.sameElements(li.labels.labels)})
-    println("Accuracy: %f" format ((matching.size * 1.0) / instances.size))
-    labeledInstances.foreach(l => println(l.labels.labels.toSeq))
+    val matching = for ((i, li) <- instances.zip(labeledInstances)) yield
+      (for ((x, y) <- i.labels.labels.zip(li.labels.labels) if x == y) yield 1.0).length * 1.0 / (i.labels.labels.length)
+    println("Accuracy: %f" format (matching.sum / matching.length))
+//    labeledInstances.foreach(l => println(l.labels.labels.toSeq))
   }
 
   def generateInstance(weights: Weights, labelDomain: Domain, obsDomain: Domain, instanceLength: Int, initialState: Int): Instance = {
@@ -114,8 +114,8 @@ object LinearChainCRF {
       while (o < numObs) {
         val curObs = instance.obs.obs(o)
         val curState = instance.labels.labels(o)
-        markovStats(markovStatIdx(prevState, curState)) += 1
-        obsStats(obsStatIdx(curState, curObs)) += 1
+        markovStats(markovStatIdx(prevState, curState)) = 1
+        obsStats(obsStatIdx(curState, curObs)) = 1
         prevState = curState
         o += 1
       }
@@ -123,8 +123,8 @@ object LinearChainCRF {
     }
   }
 
-  class Learn(val labelDomain: Domain, val obsDomain: Domain, sgdPasses: Int = 5,
-    learningRate: Double = 0.01, l2: Double = 0.01) extends CrfHelpers {
+  class Learn(val labelDomain: Domain, val obsDomain: Domain, sgdPasses: Int = 20,
+    learningRate: Double = 0.01, l2: Double = 0.1) extends CrfHelpers {
     def learnWeightsMaxLikelihood(instances: Seq[Instance]): Weights = {
       val weights = Weights(Array.fill(labelDomain.size * obsDomain.size)(0.0), Array.fill(labelDomain.size * labelDomain.size)(0.0))
       val infer = new Infer(weights, labelDomain, obsDomain)
