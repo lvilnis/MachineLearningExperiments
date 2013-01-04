@@ -86,7 +86,7 @@ object LinearChainCRF {
       }
     }
 
-    @inline def overStates(fun: Int => Double): Array[Double] = Array.tabulate(labelDomain.size)(fun)
+    @inline def overStates[A: Manifest](fun: Int => A): Array[A] = Array.tabulate(labelDomain.size)(fun)
 
     def calculateNextForward(lastFwd: Array[Double], nextObs: Int): Array[Double] =
       overStates(j => fastSum(overStates(i => score(i, j, nextObs) + lastFwd(i))))
@@ -95,14 +95,19 @@ object LinearChainCRF {
 
     def calculateLastBackward(lastObs: Int, nextBackward: Array[Double]): Array[Double] =
       overStates(i => fastSum(overStates(j => score(i, j, lastObs) + nextBackward(j))))
-    val initialBwd = overStates(_ => 1)
+    val initialBwd = overStates(_ => 1.0)
     val backwardVars = obs.obs.scanRight(initialBwd)(calculateLastBackward).reverse
 
-    def calculateNextViterbi(lastViterbi: Array[Double], nextObs: Int): Array[Double] =
-      overStates(j => overStates(i => score(i, j, nextObs) + lastViterbi(i)).max)
-    val initialViterbi = initialFwd
-    val mapAssignment = obs.obs.scanLeft(initialViterbi)(calculateNextViterbi).map(_.zipWithIndex.maxBy(_._1)._2)
-
+    def calculateNextViterbi(lastViterbi: Array[(Double, Int)], nextObs: Int): Array[(Double, Int)] =
+      overStates(j => overStates(i => (score(i, j, nextObs) + lastViterbi(i)._1, i)).maxBy(_._1))
+    val initialViterbi = initialFwd.map(f => (f, 0))
+    val viterbis = obs.obs.scanLeft(initialViterbi)(calculateNextViterbi)
+    val lastV = viterbis.last
+    val restV = viterbis.dropRight(1)
+    val finalAssignment = lastV.zipWithIndex.maxBy(_._1._1)
+    val finalBackpointer = finalAssignment._1._2
+    val finalIndex = finalAssignment._2
+    val mapAssignment = restV.scanRight(finalBackpointer)((arr, ptr) => arr(ptr)._2)
     Label(mapAssignment.drop(1))
   }
 }
