@@ -10,9 +10,9 @@ object MarkovChainGenerator {
 
     val wordsToFollowingWordsAndCounts =
       pairsWithCounts.toSeq
-        .map({ case ((a, b), num) => (a, (b, num)) })
-        .groupBy({ case (a, _) => a })
-        .mapValues(_.map({ case (_, (b, num)) => (b, num) }))
+        .map({ case ((fst, snd), cnt) => (fst, (snd, cnt)) })
+        .groupBy(_._1)
+        .mapValues(_.map({ case (_, (snd, num)) => (snd, num) }))
 
     val sortedByFrequency = wordsToFollowingWordsAndCounts.mapValues(_.sortBy(_._2))
 

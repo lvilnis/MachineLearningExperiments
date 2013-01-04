@@ -17,9 +17,9 @@ object LDAWithCollapsedGibbsSampling {
     val M = documents.length
     val K = numTopics
     val J = distinctWords.length
-    val y = Array.tabulate (M) { di =>
+    val y = Array.tabulate(M) { di =>
       val doc = documents(di)
-      Array.tabulate (doc.length) { wi => distinctWordToIndex(doc(wi)) }
+      Array.tabulate(doc.length) { wi => distinctWordToIndex(doc(wi)) }
     }
 
     // alpha is the prior distribution over topics
@@ -31,8 +31,8 @@ object LDAWithCollapsedGibbsSampling {
 
     // z(a, b) is the topic of the b'th word in the a'th document
     // use a uniform random initial assignment of topic to each word
-    val z = Array.tabulate (M) { di =>
-      Array.fill (documents(di).length) { scala.util.Random.nextInt(K) }
+    val z = Array.tabulate(M) { di =>
+      Array.fill(documents(di).length) { scala.util.Random.nextInt(K) }
     }
 
     // c(k, m, j) is number of times word j is assigned to topic k in document m
@@ -89,10 +89,10 @@ object LDAWithCollapsedGibbsSampling {
     }
 
     // now, group all the words into topics
-     val topicWordPairs = for {
-        (doc, d) <- z.zipWithIndex.toSeq
-        (t, w) <- doc.zipWithIndex
-      } yield (t, distinctWords(y(d)(w)))
+    val topicWordPairs = for {
+      (doc, d) <- z.zipWithIndex.toSeq
+      (t, w) <- doc.zipWithIndex
+    } yield (t, distinctWords(y(d)(w)))
 
     val topics = topicWordPairs.groupBy(_._1).mapValues(_.map(_._2))
     topics.toSeq.map(_._2)
@@ -116,7 +116,7 @@ object LDAWithCollapsedGibbsSampling {
     val escapedText = text.replace("&", "&amp;");
     val xmlDoc = XML.loadString("<?xml version=\"1.0\"?>\r\n<root>" + escapedText + "</root>")
     xmlDoc.child
-      .map(x => (x\"TEXT").text)
+      .map(x => (x \ "TEXT").text)
       .filter(_ != "")
       .toList
   }
@@ -131,7 +131,7 @@ object LDAWithCollapsedGibbsSampling {
   }
 
   def main(args: Array[String]) {
-    timed ("Inferred topics in %d ms" format _) {
+    timed("Inferred topics in %d ms" format _) {
       val numTopics = 50
       val numDocs = 500
       val skipMostCommonWords = 100

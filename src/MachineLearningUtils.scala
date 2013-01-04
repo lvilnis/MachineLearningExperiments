@@ -35,7 +35,7 @@ object MachineLearningUtils {
 
   def getWordSequenceFromLocalFile(fileName: String): Seq[String] =
     readLocalTextFile(fileName) |> getWordSequenceFromString
-  
+
   def scramble[A](xs: Seq[A]): Seq[A] =
     xs.sortBy(_ => scala.math.random)
 
@@ -53,18 +53,32 @@ object MachineLearningUtils {
 
   type Dist[+T] = () => T
 
-  def dist[T](body: => T): Dist[T] = () => { body }
+  def dist[T](body: => T): Dist[T] = () => {body }
 
   def uniform: Dist[Double] = dist { scala.math.random }
 
   trait DistWrapper[+T] {
     def d: Dist[T]
+
     def flatMap[U](mapper: T => Dist[U]): Dist[U] = dist { mapper(d())() }
+
     def map[U](mapper: T => U): Dist[U] = dist { mapper(d()) }
   }
 
   implicit def dist2Wrapper[T](toWrap: Dist[T]): DistWrapper[T] = new DistWrapper[T] {
     val d = toWrap
+  }
+
+  def sample(weightedCases: Seq[(Double, Int)]): Int = {
+    val cases = weightedCases.map(_._2)
+    val weights = weightedCases.map(_._1)
+    val summedWeights = weights.scan(0d)(_ + _).drop(1)
+    val sumOfWeights = summedWeights.last
+    val probs = summedWeights.map(_ / sumOfWeights)
+    val casesAndProbs = cases.zip(probs)
+    val roll = uniform()
+    val (caseChoice, _) = casesAndProbs.find({ case (_, prob) => prob > roll }).get
+    caseChoice
   }
 
   def getWeightedCasesDistribution[T](weightedCases: Seq[(T, Double)]): Dist[T] = {
@@ -76,7 +90,7 @@ object MachineLearningUtils {
     val casesAndProbs = cases.zip(probs)
     for {
       roll <- uniform
-      val (caseChoice, _) = casesAndProbs.find({ case (_, prob) => prob > roll }).get
+      (caseChoice, _) = casesAndProbs.find({ case (_, prob) => prob > roll }).get
     } yield caseChoice
   }
 
