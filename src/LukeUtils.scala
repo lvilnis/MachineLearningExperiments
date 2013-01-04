@@ -15,7 +15,7 @@ object LukeUtils {
     }
   }
 
-  val localPath = "inputs\\";
+  val localPath = "inputs\\"
 
   def readLocalTextFile(path: String): String =
     readTextFile(localPath + path)
@@ -43,5 +43,35 @@ object LukeUtils {
       val result = body
       println(showTime(System.currentTimeMillis - start))
       result
+  }
+
+  def add(x: Array[Double], y: Array[Double]): Unit = {
+    var i = 0
+    while (i < x.length) {
+      x(i) += y(i)
+      i += 1
+    }
+  }
+
+  @inline def logSumExp(arr: Array[Double]): Double = {
+    val max = arr.max
+    var sum = max
+    var i = 0
+    while (i < arr.length) {
+      sum += math.exp(arr(i) - max)
+      i += 1
+    }
+    sum
+  }
+
+  // why do I have to write this myself, again? come on, Scala...
+  @inline def fastSum(arr: Array[Double]): Double = {
+    var sum = 0.0
+    var topic = 0
+    while (topic < arr.length) {
+      sum += arr(topic)
+      topic += 1
+    }
+    sum
   }
 }

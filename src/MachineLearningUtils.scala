@@ -69,9 +69,9 @@ object MachineLearningUtils {
     val d = toWrap
   }
 
-  def sample(weightedCases: Seq[(Double, Int)]): Int = {
-    val cases = weightedCases.map(_._2)
-    val weights = weightedCases.map(_._1)
+  def sample(weightedCases: Seq[Double]): Int = {
+    val cases = weightedCases.zipWithIndex.map(_._2)
+    val weights = weightedCases
     val summedWeights = weights.scan(0d)(_ + _).drop(1)
     val sumOfWeights = summedWeights.last
     val probs = summedWeights.map(_ / sumOfWeights)
@@ -100,14 +100,4 @@ object MachineLearningUtils {
   type BinaryClassifier[Data] = Classifier[Data, Boolean]
   type DocumentClassifier[Label] = Classifier[String, Label]
 
-  // why do I have to write this myself, again? come on, Scala...
-  @inline def fastSum(arr: Array[Double]): Double = {
-    var sum = 0.0
-    var topic = 0
-    while (topic < arr.length) {
-      sum += arr(topic)
-      topic += 1
-    }
-    sum
-  }
 }
