@@ -68,11 +68,11 @@ object LinearChainCRF {
 
 //    return
 
-    val instances = for (_ <- 1 to 100) yield generateInstance(weights, labelDomain, obsDomain, 25, 0)
+    val instances = for (_ <- 1 to 100) yield generateInstance(weights, labelDomain, obsDomain, 5, 0)
 
     val learner = new Learn(labelDomain, obsDomain)
 
-    val learnedWeights = learner.learnWeightsPerceptron(instances)
+    val learnedWeights = learner.learnWeightsMaxLikelihood(instances)
 
     println("Obs weights:")
     learnedWeights.obs.foreach(println(_))
@@ -122,8 +122,8 @@ object LinearChainCRF {
     }
   }
 
-  class Learn(val labelDomain: Domain, val obsDomain: Domain, sgdPasses: Int = 200,
-    learningRate: Double = 0.1, l2: Double = 0.01) extends CrfHelpers {
+  class Learn(val labelDomain: Domain, val obsDomain: Domain, sgdPasses: Int = 20,
+    learningRate: Double = 0.01, l2: Double = 0.01) extends CrfHelpers {
     def learnWeightsMaxLikelihood(instances: Seq[Instance]): Weights = {
       val weights = Weights(Array.fill(labelDomain.size * obsDomain.size)(0.0), Array.fill(labelDomain.size * labelDomain.size)(0.0))
       val infer = new Infer(weights, labelDomain, obsDomain)
@@ -133,18 +133,16 @@ object LinearChainCRF {
         val obsGradient = Array.fill(labelDomain.size * obsDomain.size)(0.0)
         for (o <- 0 until inst.obs.obs.size; i <- 0 until labelDomain.size; j <- 0 until labelDomain.size) {
           val curObs = inst.obs.obs(o)
-          val curObsGradIdx = j * obsDomain.size + curObs
-          val curMarkovGradIdx = j * labelDomain.size + i
           val curProb = math.exp(marginal.prob(curObs, i, j))
-          println("Marginal log prob y_%d=%d y_%d=%d x_%d=%d is equal to %f" format (o - 1, i, o, j, o, curObs, marginal.prob(curObs, i, j)))
-          obsGradient(curObsGradIdx) -= curProb
-          markovGradient(curMarkovGradIdx) -= curProb
+//          println("Marginal log prob y_%d=%d y_%d=%d x_%d=%d is equal to %f" format (o - 1, i, o, j, o, curObs, marginal.prob(curObs, i, j)))
+          obsGradient(obsStatIdx(j, curObs)) -= curProb
+          markovGradient(markovStatIdx(i, j)) -= curProb
         }
         val (obsStats, markovStats) = getSufficientStatistics(inst)
-        add(markovGradient, markovStats)
-        add(obsGradient, obsStats)
-        println("Obs grad:" + obsGradient.toSeq)
-        println("Markov grad:" + markovGradient.toSeq)
+        markovGradient += markovStats
+        obsGradient += obsStats
+//        println("Obs grad:" + obsGradient.toSeq)
+//        println("Markov grad:" + markovGradient.toSeq)
         // add by SGD for now
         for (i <- 0 until markovGradient.size) weights.markov(i) += (markovGradient(i) - l2 * weights.markov(i)) * learningRate
         for (i <- 0 until obsGradient.size) weights.obs(i) += (obsGradient(i) - l2 * weights.obs(i)) * learningRate
@@ -199,10 +197,10 @@ object LinearChainCRF {
       val initialBwd = overStates(_ => 0.0)
       val backwardVars = obs.obs.scanRight(initialBwd)(calculateLastBackward)
 
-      println("forward vars")
-      forwardVars.map(_.toSeq).foreach(println)
-      println("backward vars")
-      backwardVars.map(_.toSeq).foreach(println)
+//      println("forward vars")
+//      forwardVars.map(_.toSeq).foreach(println)
+//      println("backward vars")
+//      backwardVars.map(_.toSeq).foreach(println)
 
       val marginals = for (o <- 1 until forwardVars.size) yield
         overStates(i => overStates(j => forwardVars(o - 1)(i) + score(i, j, obs.obs(o - 1)) + backwardVars(o)(j)))

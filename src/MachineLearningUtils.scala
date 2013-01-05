@@ -70,13 +70,13 @@ object MachineLearningUtils {
 
   @inline def logSumExp(arr: Array[Double]): Double = {
     val max = arr.max
-    var sum = max
+    var sum = 0.0
     var i = 0
     while (i < arr.length) {
       sum += math.exp(arr(i) - max)
       i += 1
     }
-    sum
+    max + math.log(sum)
   }
 
   def sample(weightedCases: Seq[Double]): Int = {
