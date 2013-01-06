@@ -177,7 +177,7 @@ object LinearChainCRF {
       val markovScore = weights.markov(markovStatIdx(leftLabel, rightLabel))
       val obsScore = weights.obs(obsStatIdx(rightLabel, rightObs))
 //      println("Score: " + (markovScore + obsScore))
-      markovScore + obsScore /*+ weights.bias(biasStatIdx(rightLabel)) + weights.bias(biasStatIdx(leftLabel))*/
+      markovScore + obsScore + weights.bias(biasStatIdx(rightLabel))
     }
 
     @inline def overStates[A: Manifest](fun: Int => A): Array[A] = Array.tabulate(labelDomain.size)(fun)
