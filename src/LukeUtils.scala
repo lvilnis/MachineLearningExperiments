@@ -76,6 +76,15 @@ object LukeUtils {
       }
       wrapArray(output)
     }
+    def dot(other: ArrayWrapper): Double = {
+      var i = 0
+      var result = 0.0
+      while (i < arr.length) {
+        result += arr(i) * other.arr(i)
+        i += 1
+      }
+      result
+    }
     def +=(other: ArrayWrapper): this.type = {
       var i = 0
       while (i < arr.length) {
@@ -126,6 +135,13 @@ object LukeUtils {
       x(i) += y(i)
       i += 1
     }
+  }
+
+  def max2Index[A, B: Ordering](xs: Iterable[A])(fun: A => B): (Int, Int) = {
+    val xsIndexed = xs.zipWithIndex
+    val best = xsIndexed.maxBy(t => fun(t._1))._2
+    val secondBest = (xsIndexed.take(best) ++ xsIndexed.drop(best + 1)).maxBy(t => fun(t._1))._2
+    (best, secondBest)
   }
 
   def maxIndex[A, B: Ordering](xs: Iterable[A])(fun: A => B): Int = xs.zipWithIndex.maxBy(t => fun(t._1))._2
