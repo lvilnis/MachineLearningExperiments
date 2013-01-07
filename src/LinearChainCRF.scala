@@ -56,7 +56,7 @@ object LinearChainCRF {
     val obsWeights = Array(10.0, 1.0, 1.0, 1.0, 10.0, 15.0)
     val biasWeights = Array(5.0, 3.0)
     val weights = Weights(obsWeights, markovWeights, biasWeights)
-    val generatedWords = generateInstance(weights, labelDomain, obsDomain, 13, 0)
+    val generatedWords = generateInstance(weights, labelDomain, obsDomain, 30, 0)
     println("actual labels:")
     printLabels(generatedWords.labels)
     val mapEstimate = new Infer(weights, labelDomain, obsDomain).inferViterbi(generatedWords.obs)
@@ -70,12 +70,12 @@ object LinearChainCRF {
     val learnedWeights = learner.learnWeightsMaxLikelihood(instances)
 
     println("Obs weights:")
-    learnedWeights.obs.foreach(println(_))
+    learnedWeights.obs.foreach(println)
     println("Markov weights:")
-    learnedWeights.markov.foreach(println(_))
+    learnedWeights.markov.foreach(println)
 
     val infer = new Infer(learnedWeights, labelDomain, obsDomain)
-    val mapEstimates = instances.map(_.obs).map(infer.inferViterbi(_))
+    val mapEstimates = instances.map(_.obs).map(infer.inferViterbi)
 //    mapEstimates.map(_.labels.toSeq).foreach(println)
     val labeledInstances = map2(instances.map(_.obs), mapEstimates)(Instance(_, _))
     val matching = map2(instances, labeledInstances)((i, li) => pctSame(i.labels.labels, li.labels.labels))
@@ -131,16 +131,17 @@ object LinearChainCRF {
       val infer = new Infer(weights, labelDomain, obsDomain)
       for (p <- 1 to sgdPasses; inst <- instances) {
         val marginal = infer.inferForwardBackward(inst.obs)
-        val gradient = blankWeights
+        val expectedSufficientStats = blankWeights
         for (o <- 0 until inst.obs.obs.size; i <- 0 until labelDomain.size; j <- 0 until labelDomain.size) {
           val curObs = inst.obs.obs(o)
           val curProb = math.exp(marginal.prob(curObs, i, j))
 //          println("Marginal log prob y_%d=%d y_%d=%d x_%d=%d is equal to %f" format (o - 1, i, o, j, o, curObs, marginal.prob(curObs, i, j)))
-          gradient.obs(obsStatIdx(j, curObs)) -= curProb
-          gradient.markov(markovStatIdx(i, j)) -= curProb
-          gradient.bias(biasStatIdx(j)) -= curProb
+          expectedSufficientStats.obs(obsStatIdx(j, curObs)) += curProb
+          expectedSufficientStats.markov(markovStatIdx(i, j)) += curProb
+          expectedSufficientStats.bias(biasStatIdx(j)) += curProb
         }
-        gradient += getSufficientStatistics(inst)
+        val gradient = getSufficientStatistics(inst)
+        gradient -= expectedSufficientStats
         takeGradientStep(weights, gradient)
       }
       weights
