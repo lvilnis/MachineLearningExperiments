@@ -68,6 +68,22 @@ object MachineLearningUtils {
     val d = toWrap
   }
 
+  @inline def logSumExp(arr: Array[Array[Double]]): Double = {
+    val max = arr.flatten.max
+    var sum = 0.0
+    var i = 0
+    while (i < arr.length) {
+      val inner = arr(i)
+      var j = 0
+      while (j < inner.length) {
+        sum += math.exp(inner(j) - max)
+        j += 1
+      }
+      i += 1
+    }
+    max + math.log(sum)
+  }
+
   @inline def logSumExp(arr: Array[Double]): Double = {
     val max = arr.max
     var sum = 0.0

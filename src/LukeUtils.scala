@@ -101,6 +101,14 @@ object LukeUtils {
       }
       this
     }
+    def -=(v: Double): this.type = {
+      var i = 0
+      while (i < arr.length) {
+        arr(i) -= v
+        i += 1
+      }
+      this
+    }
     def *=(other: ArrayWrapper): this.type = {
       var i = 0
       while (i < arr.length) {

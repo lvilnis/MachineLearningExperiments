@@ -67,7 +67,7 @@ object LinearChainCRF {
 
     val learner = new Learn(labelDomain, obsDomain)
 
-    val learnedWeights = learner.learnWeightsStructuredSVM(instances)
+    val learnedWeights = learner.learnWeightsMaxLikelihood(instances)
 
     println("Obs weights:")
     learnedWeights.obs.foreach(println(_))
@@ -197,8 +197,11 @@ object LinearChainCRF {
     @inline def overStates[A: Manifest](fun: Int => A): Array[A] = Array.tabulate(labelDomain.size)(fun)
 
     def inferMaxMarginal(obs: Observation): Label = {
+      val labelRange = 0 until labelDomain.size
       val factorMarginals = inferForwardBackward(obs)
-      sys.error("tbd")
+      def getLabelMarginal(fm: Array[Array[Double]]) = labelRange.map(j => labelRange.map(fm(_)(j)).sum)
+      val labelMarginals = factorMarginals.probs.map(getLabelMarginal)
+      Label(labelMarginals.map(maxAndIndex(_)).map(_._2))
     }
 
     def inferForwardBackward(obs: Observation): Marginal = {
@@ -220,8 +223,8 @@ object LinearChainCRF {
       val marginals = for (o <- 1 until forwardVars.size) yield
         overStates(i => overStates(j => forwardVars(o - 1)(i) + score(i, j, obs.obs(o - 1)) + backwardVars(o)(j)))
 
-//      marginals.foreach(_.foreach(_.foreach(println)))
-
+      // need to normalize log probs
+      for (m <- marginals; logZ = logSumExp(m)) m.foreach(_ -= logZ)
       Marginal(marginals)
     }
 
