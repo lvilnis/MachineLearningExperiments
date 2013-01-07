@@ -49,14 +49,14 @@ object LinearChainCRF {
 //    val obsDomain = Domain()
 //    val sentences = sentenceStrings.map(_.map(obsDomain.indexForWord(_)))
 
-    val obsDomain = Domain("FOO", "BAR", "BAZ")
-    val labelDomain = Domain("GOOD", "BAD")
-    def printLabels(l: Label): Unit = println(l.labels.map(labelDomain.wordForIndex(_)))
-    val markovWeights = Array(10.0, 2.0, 2.0, 10.0)
-    val obsWeights = Array(10.0, 1.0, 1.0, 1.0, 10.0, 15.0)
-    val biasWeights = Array(5.0, 3.0)
+    val obsDomain = Domain("FOO", "BAR", "BAZ" /*, "QUX"*/)
+    val labelDomain = Domain("GOOD", "BAD" /*, "HUH"*/)
+    def printLabels(l: Label): Unit = println(l.labels.map(labelDomain.wordForIndex))
+    val markovWeights = Array(10.0, 2.0, 2.0, 10.0 /*, 10.0, 5.0, 2.0, 10.0, 5.0*/)
+    val obsWeights = Array(10.0, 1.0, 1.0, 1.0, 10.0, 15.0 /*, 20.0, 7.0, 2.0, 2.0, 3.0, 20.0*/)
+    val biasWeights = Array(5.0, 3.0, 1.0)
     val weights = Weights(obsWeights, markovWeights, biasWeights)
-    val generatedWords = generateInstance(weights, labelDomain, obsDomain, 30, 0)
+    val generatedWords = generateInstance(weights, labelDomain, obsDomain, 20, 0)
     println("actual labels:")
     printLabels(generatedWords.labels)
     val mapEstimate = new Infer(weights, labelDomain, obsDomain).inferViterbi(generatedWords.obs)
@@ -67,17 +67,19 @@ object LinearChainCRF {
 
     val learner = new Learn(labelDomain, obsDomain)
 
-    val learnedWeights = learner.learnWeightsMaxLikelihood(instances)
+    val learnedWeights = learner.learnWeightsStructuredSVM(instances)
 
     println("Obs weights:")
     learnedWeights.obs.foreach(println)
     println("Markov weights:")
     learnedWeights.markov.foreach(println)
+    println("Bias weights:")
+    learnedWeights.bias.foreach(println)
 
     val infer = new Infer(learnedWeights, labelDomain, obsDomain)
     val mapEstimates = instances.map(_.obs).map(infer.inferViterbi)
 //    mapEstimates.map(_.labels.toSeq).foreach(println)
-    val labeledInstances = map2(instances.map(_.obs), mapEstimates)(Instance(_, _))
+    val labeledInstances = map2(instances.map(_.obs), mapEstimates)(Instance)
     val matching = map2(instances, labeledInstances)((i, li) => pctSame(i.labels.labels, li.labels.labels))
     println("Accuracy: %f" format average(matching))
 //    labeledInstances.foreach(l => println(l.labels.labels.toSeq))
@@ -86,8 +88,6 @@ object LinearChainCRF {
   def generateInstance(weights: Weights, labelDomain: Domain, obsDomain: Domain, instanceLength: Int, initialState: Int): Instance = {
     val hiddenLabelIndices = Stream.iterate(initialState, instanceLength)(state =>
       sample(weights.markov.slice(state * labelDomain.size, state * labelDomain.size + labelDomain.size))).toArray
-//    val hiddenLabels = Seq("GOOD","GOOD","GOOD","GOOD","GOOD","GOOD","BAD","BAD","BAD","BAD","BAD", "GOOD", "GOOD")
-//    val hiddenLabelIndices = hiddenLabels.map(labelDomain.indexForWord(_))
     def generateWord(curLabel: Int): Int =
       sample(weights.obs.slice(curLabel * obsDomain.size, curLabel * obsDomain.size + obsDomain.size))
     Instance(Observation(hiddenLabelIndices.map(generateWord)), Label(hiddenLabelIndices))
@@ -172,11 +172,11 @@ object LinearChainCRF {
       val weights = blankWeights
       val infer = new Infer(weights, labelDomain, obsDomain)
       for (p <- 1 to sgdPasses; inst <- instances) {
-        val (mapLabel, mapScore) = infer.inferLossAugmentedViterbi(inst)
+        val (mapLabel, mapScorePlusLoss) = infer.inferLossAugmentedViterbi(inst)
         val hammingLoss =  inst.length - countSame(mapLabel.labels, inst.labels.labels)
         // try to make sure margin of score of ground-truth over best-wrong labeling is > hammingloss
         val groundTruthScore = getSufficientStatistics(inst) dot weights
-        if (groundTruthScore <= mapScore + hammingLoss) {
+        if (groundTruthScore <= mapScorePlusLoss) {
           // we need to make an update
           val gradient = blankWeights
           gradient += getSufficientStatistics(inst)
@@ -254,6 +254,5 @@ object LinearChainCRF {
       val mapAssignment = viterbis.drop(2).scanRight(finalState)((arr, ptr) => arr(ptr)._2)
       (Label(mapAssignment), viterbis.last.map(_._1).max)
     }
-
   }
 }
